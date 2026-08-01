@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kvitto #{{ order_id[:6] }}</title>
+<style>
+  body { font-family: 'Courier New', monospace; background: #eee; margin: 0; padding: 20px; }
+  .paper { background: #fff; width: 320px; margin: 0 auto 16px; padding: 16px; white-space: pre;
+           font-size: 13px; line-height: 1.35; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .bar { max-width: 320px; margin: 0 auto 16px; display: flex; gap: 8px; }
+  .bar button { flex: 1; padding: 12px; border: 0; border-radius: 8px; cursor: pointer;
+                font-family: -apple-system, sans-serif; font-size: .95rem; }
+  .print { background: #2f4436; color: #fff; }
+  .klabel { text-align: center; font-family: -apple-system, sans-serif; font-size: .8rem;
+            color: #888; margin: 0 auto 4px; max-width: 320px; }
+  @media print { .bar, .klabel { display: none; } body { background: #fff; padding: 0; }
+                 .paper { box-shadow: none; page-break-after: always; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="print" onclick="window.print()">🖨️ Skriv ut</button>
+</div>
+<p class="klabel">Köksbong</p>
+<div class="paper">{{ kitchen_text }}</div>
+<p class="klabel">Kundkvitto</p>
+<div class="paper">{{ receipt_text }}</div>
+</body>
+</html>

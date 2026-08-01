@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="{{ spec.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ spec.business_name }}</title>
+<style>
+  :root {
+    --primary: {{ spec.theme.primary_color }};
+    --accent: {{ spec.theme.accent_color }};
+    --bg: {{ spec.theme.background_color }};
+    --text: {{ spec.theme.text_color }};
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: {% if spec.theme.font == 'serif' %}Georgia, 'Times New Roman', serif{% elif spec.theme.font == 'sans' %}-apple-system, 'Segoe UI', Helvetica, sans-serif{% else %}-apple-system, 'Segoe UI', sans-serif{% endif %};
+    line-height: 1.55;
+  }
+  h1, h2, h3 { {% if spec.theme.font != 'sans' %}font-family: Georgia, 'Times New Roman', serif;{% endif %} color: var(--primary); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+  .announce { background: var(--accent); color: #fff; text-align: center; padding: 8px 16px; font-size: .92rem; }
+  nav { display: flex; align-items: center; padding: 16px 0; gap: 16px; }
+  nav .logo { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+  nav .cartbtn { margin-left: auto; background: var(--primary); color: #fff; border: 0; padding: 9px 18px;
+      border-radius: 999px; cursor: pointer; font-size: .95rem; }
+  .hero { text-align: center; padding: 56px 16px 46px; }
+  .hero .emoji { font-size: 3rem; }
+  .hero h1 { font-size: 2.6rem; margin: 10px 0 8px; }
+  .hero p { font-size: 1.15rem; opacity: .75; max-width: 560px; margin: 0 auto; }
+  .badges { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  .badge { border: 1px solid var(--primary); color: var(--primary); border-radius: 999px;
+      padding: 4px 14px; font-size: .85rem; }
+  section { padding: 34px 0; }
+  section > h2 { font-size: 1.7rem; margin-bottom: 6px; }
+  .about p { max-width: 640px; opacity: .85; }
+  .category { margin-top: 26px; }
+  .category h3 { font-size: 1.25rem; border-bottom: 2px solid var(--accent); display: inline-block;
+      padding-bottom: 3px; margin-bottom: 14px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .item { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; padding: 16px;
+      display: flex; flex-direction: column; gap: 6px; }
+  .item .top { display: flex; justify-content: space-between; gap: 10px; }
+  .item .name { font-weight: 700; }
+  .item .price { white-space: nowrap; color: var(--primary); font-weight: 700; }
+  .item .desc { font-size: .9rem; opacity: .75; flex: 1; }
+  .item .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: .72rem; background: var(--bg); border: 1px solid rgba(0,0,0,.12);
+      padding: 2px 8px; border-radius: 999px; opacity: .8; }
+  .item button { align-self: flex-start; margin-top: 6px; background: var(--accent); color: #fff; border: 0;
+      padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: .88rem; }
+  .info { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .info h3 { margin-bottom: 8px; }
+  .info li { list-style: none; font-size: .95rem; opacity: .85; }
+  footer { padding: 26px 0 40px; font-size: .85rem; opacity: .6; text-align: center; }
+  /* Cart drawer */
+  .drawer { position: fixed; top: 0; right: -420px; width: min(400px, 100vw); height: 100vh; background: #fff;
+      box-shadow: -6px 0 24px rgba(0,0,0,.15); transition: right .25s; padding: 22px; overflow-y: auto; z-index: 50;
+      display: flex; flex-direction: column; }
+  .drawer.open { right: 0; }
+  .drawer h2 { display: flex; justify-content: space-between; }
+  .drawer .close { background: none; border: 0; font-size: 1.4rem; cursor: pointer; color: var(--text); }
+  .cline { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #eee; font-size: .93rem; }
+  .cline .n { flex: 1; }
+  .cline button { width: 26px; height: 26px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+  .total { display: flex; justify-content: space-between; font-weight: 700; padding: 14px 0; font-size: 1.05rem; }
+  .drawer label { font-size: .8rem; font-weight: 600; margin-top: 10px; display: block; }
+  .drawer input, .drawer select { width: 100%; padding: 9px 10px; border: 1px solid #ddd; border-radius: 8px; margin-top: 4px; }
+  .paybtn { margin-top: 16px; width: 100%; padding: 13px; background: var(--primary); color: #fff; border: 0;
+      border-radius: 8px; font-size: 1rem; cursor: pointer; }
+  .paybtn:disabled { opacity: .6; }
+  .cerr { color: #b3402a; font-size: .85rem; margin-top: 8px; }
+  .empty { opacity: .6; padding: 20px 0; }
+</style>
+</head>
+<body>
+{% if kiosk %}<div class="announce" style="background:#2f4436">🏪 Beställ här — betala och hämta vid disken</div>{% endif %}
+{% for a in spec.announcements %}<div class="announce">{{ a }}</div>{% endfor %}
+<div class="wrap">
+  <nav>
+    <span class="logo">{{ spec.business_name }}</span>
+    <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span></button>
+  </nav>
+
+  <div class="hero">
+    <div class="emoji">{{ spec.hero.emoji }}</div>
+    <h1>{{ spec.hero.headline }}</h1>
+    <p>{{ spec.hero.subheadline }}</p>
+    <div class="badges">
+      {% if spec.services.pickup %}<span class="badge">{% if spec.language == 'sv' %}Avhämtning{% else %}Pickup{% endif %}</span>{% endif %}
+      {% if spec.services.delivery %}<span class="badge">{% if spec.language == 'sv' %}Hemleverans{% else %}Delivery{% endif %}</span>{% endif %}
+    </div>
+  </div>
+
+  {% if spec.about %}
+  <section class="about">
+    <h2>{% if spec.language == 'sv' %}Om oss{% else %}About us{% endif %}</h2>
+    <p>{{ spec.about }}</p>
+  </section>
+  {% endif %}
+
+  <section id="menu">
+    <h2>{% if spec.language == 'sv' %}Meny{% else %}Menu{% endif %}</h2>
+    {% for cat in spec.menu %}
+    <div class="category">
+      <h3>{{ cat.category }}</h3>
+      <div class="items">
+        {% for it in cat['items'] %}
+        <div class="item">
+          <div class="top"><span class="name">{{ it.name }}</span>
+            <span class="price">{{ '%g' % it.price }} {{ spec.currency }}</span></div>
+          <p class="desc">{{ it.description }}</p>
+          {% if it.tags %}<div class="tags">{% for t in it.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>{% endif %}
+          {% if 'in-store-only' in it.tags %}
+          <span class="tag" style="align-self:flex-start;margin-top:6px">{% if spec.language == 'sv' %}Endast i butik{% else %}In store only{% endif %}</span>
+          {% else %}
+          <button onclick="addToCart('{{ it.id }}')">{% if spec.language == 'sv' %}Lägg till{% else %}Add{% endif %} +</button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="info">
+    {% if spec.hours %}
+    <div><h3>{% if spec.language == 'sv' %}Öppettider{% else %}Opening hours{% endif %}</h3>
+      <ul>{% for h in spec.hours %}<li>{{ h.days }}: {{ h.open }}–{{ h.close }}</li>{% endfor %}</ul></div>
+    {% endif %}
+    <div><h3>{% if spec.language == 'sv' %}Kontakt{% else %}Contact{% endif %}</h3>
+      <ul>
+        {% if spec.contact.address %}<li>{{ spec.contact.address }}</li>{% endif %}
+        {% if spec.contact.phone %}<li>{{ spec.contact.phone }}</li>{% endif %}
+        {% if spec.contact.email %}<li>{{ spec.contact.email }}</li>{% endif %}
+      </ul></div>
+  </section>
+
+  <footer>{{ spec.business_name }} · Powered by Vibe Business</footer>
+</div>
+
+<div class="drawer" id="drawer">
+  <h2>{% if spec.language == 'sv' %}Din beställning{% else %}Your order{% endif %}
+    <button class="close" id="closecart">×</button></h2>
+  <div id="cartlines"><p class="empty">{% if spec.language == 'sv' %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p></div>
+  <div class="total"><span>{% if spec.language == 'sv' %}Summa{% else %}Total{% endif %}</span><span id="carttotal">0 {{ spec.currency }}</span></div>
+  <label>{% if spec.language == 'sv' %}Namn{% else %}Name{% endif %}</label>
+  <input id="cname">
+  <label>{% if spec.language == 'sv' %}Telefon{% else %}Phone{% endif %}</label>
+  <input id="cphone">
+  <label>{% if spec.language == 'sv' %}Leveranssätt{% else %}How{% endif %}</label>
+  <select id="cmode">
+    {% if spec.services.dine_in %}<option value="dine_in">{% if spec.language == 'sv' %}Äta här — beställ till bordet{% else %}Dine in — order to table{% endif %}</option>{% endif %}
+    {% if spec.services.pickup %}<option value="pickup">{% if spec.language == 'sv' %}Avhämtning{% else %}Pickup{% endif %}</option>{% endif %}
+    {% if spec.services.delivery %}<option value="delivery">{% if spec.language == 'sv' %}Hemleverans{% if spec.services.delivery_fee %} (+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}){% endif %}{% else %}Delivery{% if spec.services.delivery_fee %} (+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}){% endif %}{% endif %}</option>{% endif %}
+  </select>
+  <div id="addrwrap" style="display:none">
+    <label>{% if spec.language == 'sv' %}Adress{% else %}Address{% endif %}</label>
+    <input id="caddr">
+  </div>
+  <div id="tablewrap" style="display:none">
+    <label>{% if spec.language == 'sv' %}Bordsnummer{% else %}Table number{% endif %}</label>
+    <input id="ctable">
+  </div>
+  <div id="timewrap">
+    <label>{% if spec.language == 'sv' %}Önskad tid{% else %}Pickup time{% endif %}</label>
+    <input id="ctime" type="time">
+    <span style="font-size:.75rem;opacity:.6">{% if spec.language == 'sv' %}Lämna tomt för snarast möjligt{% else %}Leave empty for as soon as possible{% endif %}</span>
+  </div>
+  {% if payments_ready %}
+  <button class="paybtn" id="paybtn">{% if spec.language == 'sv' %}Betala & beställ →{% else %}Pay & order →{% endif %}</button>
+  <p style="font-size:.75rem;opacity:.6;margin-top:8px;text-align:center">{% if spec.language == 'sv' %}Betalning sker säkert i förväg via Stripe. Din mat börjar lagas när betalningen är klar.{% else %}Secure prepayment via Stripe. Your food is prepared once payment clears.{% endif %}</p>
+  {% else %}
+  <p class="cerr" style="margin-top:8px">{% if spec.language == 'sv' %}Onlinebetalning är inte aktiverad ännu.{% else %}Online payment is not enabled yet.{% endif %}</p>
+  {% endif %}
+  <p class="cerr" id="cerr"></p>
+</div>
+
+<script>
+const SPEC = {{ spec_json | safe }};
+const ITEMS = {};
+for (const cat of SPEC.menu) for (const it of cat.items) ITEMS[it.id] = it;
+const cart = {}; // id -> qty
+
+const drawer = document.getElementById('drawer');
+document.getElementById('cartbtn').onclick = () => drawer.classList.add('open');
+document.getElementById('closecart').onclick = () => drawer.classList.remove('open');
+function modeChanged() {
+  const v = document.getElementById('cmode').value;
+  document.getElementById('addrwrap').style.display = v === 'delivery' ? 'block' : 'none';
+  document.getElementById('tablewrap').style.display = v === 'dine_in' ? 'block' : 'none';
+  document.getElementById('timewrap').style.display = v === 'dine_in' ? 'none' : 'block';
+}
+document.getElementById('cmode').onchange = modeChanged;
+modeChanged();
+// ?table=5 from a QR code on the table pre-selects dine-in and fills the table number
+const qTable = new URLSearchParams(location.search).get('table');
+if (qTable && document.querySelector('#cmode option[value="dine_in"]')) {
+  document.getElementById('cmode').value = 'dine_in';
+  document.getElementById('ctable').value = qTable;
+  modeChanged();
+}
+
+function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); drawer.classList.add('open'); }
+function bump(id, d) { cart[id] = (cart[id] || 0) + d; if (cart[id] <= 0) delete cart[id]; renderCart(); }
+
+function renderCart() {
+  const box = document.getElementById('cartlines');
+  const ids = Object.keys(cart);
+  document.getElementById('cartcount').textContent = ids.reduce((s, i) => s + cart[i], 0);
+  if (!ids.length) {
+    box.innerHTML = '<p class="empty">{% if spec.language == "sv" %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p>';
+    document.getElementById('carttotal').textContent = '0 ' + SPEC.currency;
+    return;
+  }
+  let total = 0;
+  box.innerHTML = ids.map(id => {
+    const it = ITEMS[id]; total += it.price * cart[id];
+    return `<div class="cline"><span class="n">${it.name}</span>
+      <button onclick="bump('${id}',-1)">−</button><span>${cart[id]}</span>
+      <button onclick="bump('${id}',1)">+</button>
+      <span>${(it.price * cart[id]).toFixed(0)} ${SPEC.currency}</span></div>`;
+  }).join('');
+  document.getElementById('carttotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
+}
+
+const payBtn = document.getElementById('paybtn');
+if (payBtn) payBtn.onclick = async () => {
+  const err = document.getElementById('cerr');
+  err.textContent = '';
+  const btn = document.getElementById('paybtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/site/{{ project_id }}/checkout', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        items: Object.keys(cart).map(id => ({ id, qty: cart[id] })),
+        customer_name: document.getElementById('cname').value,
+        customer_phone: document.getElementById('cphone').value,
+        mode: document.getElementById('cmode').value,
+        address: (document.getElementById('caddr') || {}).value || '',
+        table: (document.getElementById('ctable') || {}).value || '',
+        pickup_time: (document.getElementById('ctime') || {}).value || ''
+      })
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || 'checkout failed');
+    const data = await res.json();
+    window.location.href = data.url;
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

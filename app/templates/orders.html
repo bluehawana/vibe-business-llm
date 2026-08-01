@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders — {{ project.name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #faf7f0; color: #2b2a26; padding: 30px 20px; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-family: Georgia, serif; color: #2f4436; margin-bottom: 4px; }
+  .sub { color: #6b675e; margin-bottom: 24px; }
+  .order { background: #fff; border: 1px solid #e5dfd2; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; }
+  .order .head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  .order .id { font-weight: 700; }
+  .status { font-size: .75rem; padding: 2px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
+  .status.paid { background: #dcefe0; color: #22593a; }
+  .status.pending { background: #fbeecf; color: #8a6414; }
+  .head .when { color: #9b968a; font-size: .85rem; margin-left: auto; }
+  .line { display: flex; justify-content: space-between; font-size: .9rem; padding: 2px 0; }
+  .cust { margin-top: 8px; font-size: .85rem; color: #6b675e; }
+  .empty { color: #9b968a; padding: 40px 0; text-align: center; }
+  a.back { color: #2f4436; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Orders</h1>
+  <p class="sub">{{ project.name }} · <a class="back" href="/builder/{{ project.id }}">← back to builder</a></p>
+  {% if not orders %}<p class="empty">No orders yet. Share your site link to start selling.</p>{% endif %}
+  {% for o in orders %}
+  <div class="order">
+    <div class="head">
+      <span class="id">#{{ o.id }}</span>
+      <span class="status {{ o.status }}">{{ o.status }}</span>
+      <span>{{ '%g' % o.total }} {{ o.currency }}</span>
+      <span class="when">{{ o.created_at | int }}</span>
+    </div>
+    {% for it in o['items'] %}
+    <div class="line"><span>{{ it.qty }} × {{ it.name }}</span><span>{{ '%g' % (it.price * it.qty) }} {{ o.currency }}</span></div>
+    {% endfor %}
+    <p class="cust">{{ o.customer.name }} · {{ o.customer.phone }} ·
+      {{ o.customer.mode }}{% if o.customer.address %} · {{ o.customer.address }}{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+</body>
+</html>

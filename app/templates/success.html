@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="{{ spec.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ spec.business_name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: {{ spec.theme.background_color }}; color: {{ spec.theme.text_color }};
+         font-family: Georgia, serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .card { background: #fff; border-radius: 14px; padding: 36px; max-width: 480px; width: 100%;
+          box-shadow: 0 4px 20px rgba(0,0,0,.07); text-align: center; }
+  h1 { color: {{ spec.theme.primary_color }}; margin-bottom: 8px; }
+  .check { font-size: 3rem; }
+  p { opacity: .8; margin: 8px 0; }
+  .lines { text-align: left; margin: 20px 0; font-family: -apple-system, sans-serif; font-size: .92rem; }
+  .lines div { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+  .lines .tot { font-weight: 700; border-bottom: 0; }
+  a { display: inline-block; margin-top: 18px; color: {{ spec.theme.primary_color }}; }
+  .demo { font-size: .8rem; color: #b3402a; margin-top: 14px; font-family: -apple-system, sans-serif; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="check">✅</div>
+  <h1>{% if spec.language == 'sv' %}Tack för din beställning!{% else %}Thank you for your order!{% endif %}</h1>
+  {% if order %}
+  <p>{% if spec.language == 'sv' %}Ordernummer{% else %}Order{% endif %} #{{ order.id }}</p>
+  <div class="lines">
+    {% for it in order['items'] %}
+    <div><span>{{ it.qty }} × {{ it.name }}</span><span>{{ '%g' % (it.price * it.qty) }} {{ order.currency }}</span></div>
+    {% endfor %}
+    <div class="tot"><span>{% if spec.language == 'sv' %}Summa{% else %}Total{% endif %}</span>
+      <span>{{ '%g' % order.total }} {{ order.currency }}</span></div>
+  </div>
+  <p>{% if order.customer.mode == 'delivery' %}{% if spec.language == 'sv' %}Levereras till: {{ order.customer.address }}{% else %}Delivering to: {{ order.customer.address }}{% endif %}{% else %}{% if spec.language == 'sv' %}Hämtas hos {{ spec.business_name }}{% else %}Pickup at {{ spec.business_name }}{% endif %}{% endif %}</p>
+  {% endif %}
+  {% if demo %}<p class="demo">Demo mode — no payment was processed (Stripe not configured).</p>{% endif %}
+  {% if order %}<p><a href="/receipt/{{ order.id }}" target="_blank">🖨️ {% if spec.language == 'sv' %}Skriv ut kvitto{% else %}Print receipt{% endif %}</a></p>{% endif %}
+  <a href="/site/{{ project_id }}">{% if spec.language == 'sv' %}← Tillbaka till {{ spec.business_name }}{% else %}← Back to {{ spec.business_name }}{% endif %}</a>
+</div>
+</body>
+</html>

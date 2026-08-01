@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kök — {{ project.name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #1c1e22; color: #eceae4; padding: 16px; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+  h1 { font-size: 1.3rem; }
+  .sub { color: #8d94a0; font-size: .85rem; }
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .card { background: #262a31; border-radius: 12px; padding: 14px 16px; border-left: 6px solid #5b6472; }
+  .card.new { border-left-color: #e2b93b; }
+  .card.preparing { border-left-color: #4d9fdb; }
+  .card.ready { border-left-color: #52b788; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .oid { font-weight: 700; font-size: 1.05rem; }
+  .age { font-size: .8rem; color: #8d94a0; }
+  .mode { display: inline-block; font-size: .75rem; padding: 2px 10px; border-radius: 999px;
+          background: #3a404a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .mode.dine_in { background: #59418a; }
+  .mode.delivery { background: #7a4a2b; }
+  .line { display: flex; gap: 8px; padding: 3px 0; font-size: 1rem; }
+  .line .q { font-weight: 700; min-width: 26px; color: #e2b93b; }
+  .cust { margin-top: 8px; font-size: .8rem; color: #8d94a0; }
+  .actions { margin-top: 12px; display: flex; gap: 8px; }
+  .actions button { flex: 1; padding: 10px; border: 0; border-radius: 8px; font-size: .9rem;
+                    cursor: pointer; color: #fff; }
+  .b-prep { background: #4d9fdb; } .b-ready { background: #52b788; } .b-done { background: #5b6472; }
+  .empty { color: #8d94a0; padding: 60px 0; text-align: center; font-size: 1.1rem; grid-column: 1/-1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍳 {{ project.name }} — kök</h1>
+  <span class="sub">uppdateras automatiskt var 5:e sekund</span>
+</header>
+<div class="board" id="board"><p class="empty">Inga aktiva beställningar</p></div>
+<script>
+const PID = "{{ project.id }}";
+const MODE_LABEL = { pickup: "Avhämtning", delivery: "Leverans", dine_in: "Bord" };
+
+function age(ts) {
+  const m = Math.floor((Date.now()/1000 - ts) / 60);
+  return m < 1 ? "nu" : m + " min";
+}
+
+async function setStatus(oid, state) {
+  await fetch(`/api/kitchen/${PID}/orders/${oid}/status`, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ state })
+  });
+  refresh();
+}
+
+async function refresh() {
+  const res = await fetch(`/api/kitchen/${PID}/orders`);
+  const { orders } = await res.json();
+  const board = document.getElementById("board");
+  if (!orders.length) {
+    board.innerHTML = '<p class="empty">Inga aktiva beställningar</p>';
+    return;
+  }
+  board.innerHTML = orders.map(o => {
+    const modeTxt = MODE_LABEL[o.customer.mode] || o.customer.mode;
+    const where = o.customer.mode === "dine_in" ? `Bord ${o.customer.table}`
+                : o.customer.mode === "delivery" ? o.customer.address : "";
+    const when = o.customer.mode !== "dine_in" && o.customer.pickup_time
+                ? ` · ${o.customer.pickup_time}` : "";
+    const next = o.fulfillment === "new"
+      ? `<button class="b-prep" onclick="setStatus('${o.id}','preparing')">Börja laga →</button>`
+      : o.fulfillment === "preparing"
+      ? `<button class="b-ready" onclick="setStatus('${o.id}','ready')">Klar ✓</button>`
+      : `<button class="b-done" onclick="setStatus('${o.id}','completed')">Utlämnad ✓✓</button>`;
+    return `<div class="card ${o.fulfillment}">
+      <div class="head"><span class="oid">#${o.id.slice(0,6)}</span><span class="age">${age(o.created_at)}</span></div>
+      <span class="mode ${o.customer.mode}">${modeTxt}${where ? " · " + where : ""}${when}</span>
+      ${o.items.filter(i => i.id !== "_delivery").map(i =>
+        `<div class="line"><span class="q">${i.qty}×</span><span>${i.name}</span></div>`).join("")}
+      <p class="cust">${o.customer.name} · ${o.customer.phone}</p>
+      <div class="actions">${next}</div>
+    </div>`;
+  }).join("");
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

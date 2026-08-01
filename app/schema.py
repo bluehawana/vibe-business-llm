@@ -1,0 +1,116 @@
+"""Site spec: the single JSON document that describes a business website.
+
+Claude reads and rewrites this spec on every chat turn; the renderer turns it
+into the live site. Keeping prices and services in structured data (not
+generated HTML) is what lets checkout build real Stripe line items safely.
+"""
+
+
+def _obj(props: dict) -> dict:
+    return {
+        "type": "object",
+        "properties": props,
+        "required": list(props),
+        "additionalProperties": False,
+    }
+
+
+SITE_SCHEMA = _obj({
+    "business_name": {"type": "string"},
+    "tagline": {"type": "string"},
+    "about": {"type": "string", "description": "1-2 warm paragraphs about the business"},
+    "language": {"type": "string", "description": "Site language code, e.g. 'sv' or 'en'"},
+    "currency": {"type": "string", "enum": ["SEK", "EUR", "USD", "GBP", "DKK", "NOK"]},
+    "theme": _obj({
+        "primary_color": {"type": "string", "description": "hex, used for headings/buttons"},
+        "accent_color": {"type": "string", "description": "hex"},
+        "background_color": {"type": "string", "description": "hex, light paper-like"},
+        "text_color": {"type": "string", "description": "hex, dark"},
+        "font": {"type": "string", "enum": ["serif", "sans", "mixed"]},
+    }),
+    "hero": _obj({
+        "headline": {"type": "string"},
+        "subheadline": {"type": "string"},
+        "emoji": {"type": "string", "description": "1-3 emoji that fit the cuisine"},
+    }),
+    "menu": {
+        "type": "array",
+        "items": _obj({
+            "category": {"type": "string"},
+            "items": {
+                "type": "array",
+                "items": _obj({
+                    "id": {"type": "string", "description": "stable kebab-case slug, never reuse for a different dish"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "price": {"type": "number"},
+                    "tags": {"type": "array", "items": {"type": "string"},
+                             "description": "e.g. vegetarian, vegan, spicy, popular, gluten-free"},
+                }),
+            },
+        }),
+    },
+    "services": _obj({
+        "pickup": {"type": "boolean"},
+        "delivery": {"type": "boolean", "description": "restaurant's OWN delivery (own cars/staff) — not Foodora/Wolt"},
+        "delivery_fee": {"type": "number"},
+        "min_order_for_delivery": {"type": "number"},
+        "dine_in": {"type": "boolean", "description": "order from the table/counter via QR or in-store iPad"},
+    }),
+    "hours": {
+        "type": "array",
+        "items": _obj({
+            "days": {"type": "string", "description": "e.g. 'Mon-Fri' or 'Lör-Sön'"},
+            "open": {"type": "string", "description": "e.g. '11:00'"},
+            "close": {"type": "string", "description": "e.g. '21:00'"},
+        }),
+    },
+    "contact": _obj({
+        "address": {"type": "string"},
+        "phone": {"type": "string"},
+        "email": {"type": "string"},
+    }),
+    "announcements": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Short banners, e.g. lunch offer. Empty list if none.",
+    },
+})
+
+RESPONSE_SCHEMA = _obj({
+    "reply": {
+        "type": "string",
+        "description": "Short friendly message to the owner about what you changed or suggest, in their language",
+    },
+    "site": SITE_SCHEMA,
+})
+
+DEFAULT_SPEC = {
+    "business_name": "My Restaurant",
+    "tagline": "Good food, made with care",
+    "about": "",
+    "language": "en",
+    "currency": "SEK",
+    "theme": {
+        "primary_color": "#2f4436",
+        "accent_color": "#c96f4a",
+        "background_color": "#faf7f0",
+        "text_color": "#2b2a26",
+        "font": "mixed",
+    },
+    "hero": {"headline": "Welcome", "subheadline": "", "emoji": "🍽️"},
+    "menu": [],
+    "services": {"pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
+                 "dine_in": False},
+    "hours": [],
+    "contact": {"address": "", "phone": "", "email": ""},
+    "announcements": [],
+}
+
+
+def find_menu_item(spec: dict, item_id: str):
+    for category in spec.get("menu", []):
+        for item in category.get("items", []):
+            if item.get("id") == item_id:
+                return item
+    return None
