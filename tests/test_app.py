@@ -275,14 +275,13 @@ def test_checkout_blocked_when_payments_not_configured(project_id, monkeypatch):
 
 
 def test_unpaid_order_never_reaches_kitchen(project_id, monkeypatch):
-    """Simulate the REAL Stripe flow: order created 'pending', kitchen sees
-    nothing; only after the payment webhook does it appear on the board."""
-    _enable_dine_in(project_id)
+    """Simulate the REAL Stripe flow for the online (takeaway) lane: order
+    created 'pending', kitchen sees nothing until the payment webhook fires."""
     # pretend real Stripe is active: create a pending order + fake the redirect
     monkeypatch.setattr(stripe_pay, "STRIPE_SECRET_KEY", "sk_test_x")
     monkeypatch.setattr(stripe_pay, "create_checkout_session",
                         lambda pid, oid, li, cur: f"https://stripe.test/{oid}")
-    r = checkout(project_id, mode="dine_in", table="9")
+    r = checkout(project_id, mode="pickup")  # online lane
     assert r.status_code == 200
     order_id = r.json()["url"].rsplit("/", 1)[1]
 
@@ -339,11 +338,12 @@ def test_cloudprnt_poll_serve_confirm(project_id):
     assert poll["jobReady"] is True
     assert poll["jobToken"] == order_id
 
-    # printer fetches the ticket -> plain text with table + items + PAID
+    # printer fetches the ticket -> plain text with table + items
     job = client.get(f"/api/cloudprnt/{project_id}")
     assert job.status_code == 200
     assert "Bord:" in job.text and "12" in job.text
-    assert "Margherita" in job.text and "BETALD" in job.text
+    assert "Margherita" in job.text
+    assert "BETALA I RESTAURANGEN" in job.text  # dine-in settles on Zettle
 
     # printer confirms -> job no longer offered
     assert client.delete(f"/api/cloudprnt/{project_id}?token={order_id}").status_code == 200
@@ -411,3 +411,40 @@ def test_station_with_no_items_hides_order(project_id):
 
 def test_tv_display_renders(project_id):
     assert "Klar för avhämtning" in client.get(f"/display/{project_id}").text
+
+
+# ---------- two payment lanes: dine-in (Zettle in-store) vs takeaway (Stripe) ----------
+
+def test_dine_in_pays_in_store_and_reaches_kitchen(project_id):
+    _enable_dine_in(project_id)
+    r = checkout(project_id, mode="dine_in", table="6", payment="in_store")
+    assert r.status_code == 200
+    assert "instore=1" in r.json()["url"]
+    order_id = r.json()["url"].split("order=")[1].split("&")[0]
+
+    # in-store dine-in order: unpaid but on the kitchen board immediately (guest seated)
+    order = db.get_order(order_id)
+    assert order["status"] == "in_store"
+    assert order["customer"]["payment"] == "in_store"
+    board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
+    assert any(o["id"] == order_id for o in board)
+
+    # it shows in the "settle on Zettle" list; staff settles it -> becomes paid
+    assert order_id in client.get(f"/admin/{project_id}/orders").text
+    assert client.post(f"/api/admin/{project_id}/orders/{order_id}/settle").status_code == 200
+    assert db.get_order(order_id)["status"] == "paid"
+
+
+def test_dine_in_cannot_pay_online(project_id):
+    _enable_dine_in(project_id)
+    # compliance: in-store dine-in can't be a Stripe self-pay sale
+    r = checkout(project_id, mode="dine_in", table="6", payment="online")
+    assert r.status_code == 400
+
+
+def test_takeaway_must_prepay_online(project_id):
+    # takeaway can't be settled in-store — prepay protects against no-shows
+    r = checkout(project_id, mode="pickup", payment="in_store")
+    assert r.status_code == 400
+    # default (no payment given) routes takeaway to online and succeeds
+    assert checkout(project_id, mode="pickup").status_code == 200

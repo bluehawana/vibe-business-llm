@@ -127,21 +127,34 @@ def set_fulfillment(order_id: str, state: str):
 
 
 def get_active_orders(project_id: str) -> list[dict]:
-    """Paid orders not yet completed — what the kitchen display shows."""
+    """What the kitchen display shows: prepaid online orders (status 'paid') plus
+    dine-in orders being settled in-store on Zettle (status 'in_store') — the
+    latter are cooked immediately because the guest is seated."""
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM orders WHERE project_id = ? AND status = 'paid'"
+            "SELECT * FROM orders WHERE project_id = ? AND status IN ('paid', 'in_store')"
             " AND fulfillment != 'completed' ORDER BY created_at",
             (project_id,),
         ).fetchall()
     return [_order_dict(r) for r in rows]
 
 
+def get_unsettled_orders(project_id: str) -> list[dict]:
+    """Dine-in orders awaiting payment at the counter (settle on Zettle)."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM orders WHERE project_id = ? AND status = 'in_store' ORDER BY created_at",
+            (project_id,),
+        ).fetchall()
+    return [_order_dict(r) for r in rows]
+
+
 def get_next_unprinted_order(project_id: str):
-    """Oldest paid order whose kitchen ticket hasn't printed yet (Star CloudPRNT)."""
+    """Oldest active order whose kitchen ticket hasn't printed yet (Star CloudPRNT).
+    Covers prepaid online orders and in-store dine-in orders alike."""
     with _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM orders WHERE project_id = ? AND status = 'paid'"
+            "SELECT * FROM orders WHERE project_id = ? AND status IN ('paid', 'in_store')"
             " AND printed = 0 ORDER BY created_at LIMIT 1",
             (project_id,),
         ).fetchone()

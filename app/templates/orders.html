@@ -26,7 +26,28 @@
 <body>
 <div class="wrap">
   <h1>Orders</h1>
-  <p class="sub">{{ project.name }} · <a class="back" href="/builder/{{ project.id }}">← back to builder</a></p>
+  <p class="sub">{{ project.name }} · <a class="back" href="/builder/{{ project.id }}">← back to builder</a> ·
+     <a class="back" href="/admin/{{ project.id }}/customers">kunder</a></p>
+
+  {% if unsettled %}
+  <h2 style="font-family:Georgia,serif;color:#c96f4a;font-size:1.1rem;margin:8px 0 10px">Att betala i restaurangen (Zettle)</h2>
+  {% for o in unsettled %}
+  <div class="order" style="border-left:4px solid #c96f4a">
+    <div class="head">
+      <span class="id">#{{ o.id[:6] }}</span>
+      <span>Bord {{ o.customer.table }}</span>
+      <span>{{ '%g' % o.total }} {{ o.currency }}</span>
+      <button onclick="settle('{{ o.id }}')" style="margin-left:auto;background:#2f4436;color:#fff;border:0;padding:6px 14px;border-radius:6px;cursor:pointer">Markera betald</button>
+    </div>
+  </div>
+  {% endfor %}
+  <script>
+  async function settle(id) {
+    await fetch(`/api/admin/{{ project.id }}/orders/${id}/settle`, { method: 'POST' });
+    location.reload();
+  }
+  </script>
+  {% endif %}
   {% if not orders %}<p class="empty">No orders yet. Share your site link to start selling.</p>{% endif %}
   {% for o in orders %}
   <div class="order">

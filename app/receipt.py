@@ -50,7 +50,8 @@ def kitchen_ticket(order: dict, business_name: str) -> str:
     lines.append(_line())
     lines.append(_row("Kund:", c.get("name", "")))
     lines.append(_row("Tel:", c.get("phone", "")))
-    lines.append(_center("BETALD / PAID"))
+    paid = order.get("status") == "paid"
+    lines.append(_center("BETALD / PAID" if paid else "BETALA I RESTAURANGEN"))
     return "\n".join(lines) + "\n\n\n"
 
 

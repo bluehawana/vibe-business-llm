@@ -35,6 +35,7 @@
   </div>
   <p>{% if order.customer.mode == 'delivery' %}{% if spec.language == 'sv' %}Levereras till: {{ order.customer.address }}{% else %}Delivering to: {{ order.customer.address }}{% endif %}{% else %}{% if spec.language == 'sv' %}Hämtas hos {{ spec.business_name }}{% else %}Pickup at {{ spec.business_name }}{% endif %}{% endif %}</p>
   {% endif %}
+  {% if instore %}<p>{% if spec.language == 'sv' %}Din beställning är skickad till köket. Betala vid bordet eller kassan.{% else %}Your order has been sent to the kitchen. Pay at your table or the counter.{% endif %}</p>{% endif %}
   {% if demo %}<p class="demo">Demo mode — no payment was processed (Stripe not configured).</p>{% endif %}
   {% if order %}<p><a href="/receipt/{{ order.id }}" target="_blank">🖨️ {% if spec.language == 'sv' %}Skriv ut kvitto{% else %}Print receipt{% endif %}</a></p>{% endif %}
   <a href="/site/{{ project_id }}">{% if spec.language == 'sv' %}← Tillbaka till {{ spec.business_name }}{% else %}← Back to {{ spec.business_name }}{% endif %}</a>

@@ -190,6 +190,11 @@ function modeChanged() {
   document.getElementById('addrwrap').style.display = v === 'delivery' ? 'block' : 'none';
   document.getElementById('tablewrap').style.display = v === 'dine_in' ? 'block' : 'none';
   document.getElementById('timewrap').style.display = v === 'dine_in' ? 'none' : 'block';
+  // Dine-in settles in the restaurant (Zettle); takeaway/delivery prepay online.
+  const btn = document.getElementById('paybtn');
+  if (btn) btn.textContent = v === 'dine_in'
+    ? '{% if spec.language == "sv" %}Beställ — betala i restaurangen{% else %}Order — pay in the restaurant{% endif %}'
+    : '{% if spec.language == "sv" %}Betala & beställ →{% else %}Pay & order →{% endif %}';
 }
 document.getElementById('cmode').onchange = modeChanged;
 modeChanged();
@@ -241,7 +246,8 @@ if (payBtn) payBtn.onclick = async () => {
         mode: document.getElementById('cmode').value,
         address: (document.getElementById('caddr') || {}).value || '',
         table: (document.getElementById('ctable') || {}).value || '',
-        pickup_time: (document.getElementById('ctime') || {}).value || ''
+        pickup_time: (document.getElementById('ctime') || {}).value || '',
+        payment: document.getElementById('cmode').value === 'dine_in' ? 'in_store' : 'online'
       })
     });
     if (!res.ok) throw new Error((await res.json()).detail || 'checkout failed');

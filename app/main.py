@@ -37,6 +37,7 @@ class CheckoutRequest(BaseModel):
     address: str = ""
     table: str = ""  # dine_in: table number from QR code / in-store iPad
     pickup_time: str = ""  # pickup/delivery: requested time, e.g. "18:30" or "ASAP"
+    payment: str = ""  # "online" (Stripe prepaid) | "in_store" (settle at counter via Zettle)
 
 
 class FulfillmentUpdate(BaseModel):
@@ -164,8 +165,30 @@ def checkout(project_id: str, body: CheckoutRequest):
                 "pickup_time": body.pickup_time or "ASAP"}
     currency = spec.get("currency", "SEK")
 
-    # Prepayment is mandatory. No order is ever accepted without it — an unpaid
-    # order is a no-show risk the kitchen should never cook for.
+    # Two payment lanes, gated by Swedish kassaregister rules:
+    #  - dine_in  -> "in_store": in-store manned sale, MUST settle through the
+    #    certified register (Zettle). Cooked now, guest pays at the table/counter.
+    #  - pickup/delivery -> "online": remote prepaid distance sale (Stripe),
+    #    exempt from the register requirement; prepay protects against no-shows.
+    default_payment = "in_store" if body.mode == "dine_in" else "online"
+    payment = body.payment or default_payment
+
+    if body.mode == "dine_in" and payment != "in_store":
+        # Dine-in self-pay-on-own-device via Stripe would need a certified
+        # kontrollsystem we don't yet integrate — block it rather than break the law.
+        raise HTTPException(400, "Dine-in orders are paid in the restaurant")
+    if body.mode in ("pickup", "delivery") and payment != "online":
+        raise HTTPException(400, "Takeaway and delivery are prepaid online")
+
+    customer["payment"] = payment
+
+    if payment == "in_store":
+        # Goes straight to the kitchen (guest is seated); staff settles it on
+        # Zettle afterwards and marks it paid from the orders dashboard.
+        order_id = db.create_order(project_id, order_items, customer, total, currency, "in_store")
+        return {"url": f"/site/{project_id}/success?order={order_id}&instore=1"}
+
+    # Online lane: prepayment is mandatory — no order reaches the kitchen until paid.
     if not stripe_pay.payments_configured():
         raise HTTPException(503, "Online payments are not set up yet for this shop")
 
@@ -183,11 +206,12 @@ def checkout(project_id: str, body: CheckoutRequest):
 
 
 @app.get("/site/{project_id}/success", response_class=HTMLResponse)
-def success(request: Request, project_id: str, order: str = "", demo: str = ""):
+def success(request: Request, project_id: str, order: str = "", demo: str = "", instore: str = ""):
     project = _project_or_404(project_id)
     order_data = db.get_order(order) if order else None
     return templates.TemplateResponse(request, "success.html", {
         "project_id": project_id,
+        "instore": bool(instore),
         "spec": project["spec"],
         "order": order_data,
         "demo": bool(demo),
@@ -354,7 +378,19 @@ def orders(request: Request, project_id: str):
     return templates.TemplateResponse(request, "orders.html", {
         "project": project,
         "orders": db.get_orders(project_id),
+        "unsettled": db.get_unsettled_orders(project_id),
     })
+
+
+@app.post("/api/admin/{project_id}/orders/{order_id}/settle")
+def settle_order(project_id: str, order_id: str):
+    """Staff took payment on Zettle for a dine-in order → mark it paid here."""
+    _project_or_404(project_id)
+    order = db.get_order(order_id)
+    if order is None or order["project_id"] != project_id:
+        raise HTTPException(404, "Order not found")
+    db.mark_order_paid(order_id)
+    return {"ok": True}
 
 
 @app.get("/admin/{project_id}/customers", response_class=HTMLResponse)
