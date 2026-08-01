@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ project.name }} — kontrollpanel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #faf7f0; color: #2b2a26; padding: 28px 20px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-family: Georgia, serif; color: #2f4436; }
+  .sub { color: #6b675e; margin-bottom: 8px; }
+  .host { background: #fff4d6; border: 1px solid #e8d9a0; border-radius: 8px; padding: 10px 14px;
+          font-size: .85rem; margin: 14px 0 24px; }
+  .host code { background: #f3ecd4; padding: 1px 6px; border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .card { background: #fff; border: 1px solid #e5dfd2; border-radius: 12px; padding: 16px 18px; }
+  .card .dev { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #c96f4a; font-weight: 700; }
+  .card h3 { margin: 4px 0 6px; font-size: 1.05rem; }
+  .card p { font-size: .85rem; color: #6b675e; margin-bottom: 10px; }
+  .card a { display: inline-block; background: #2f4436; color: #fff; text-decoration: none;
+            padding: 8px 14px; border-radius: 8px; font-size: .88rem; }
+  .card .path { display: block; margin-top: 8px; font-size: .75rem; color: #9b968a; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎛️ {{ project.name }}</h1>
+  <p class="sub">Kontrollpanel — öppna rätt skärm på rätt enhet</p>
+  <div class="host">
+    På iPads och Apple TV i restaurangen: ersätt <code>denna adress</code> med Mac minins adress på wifi,
+    t.ex. <code>http://192.168.1.50:8100</code>. Kör servern med <code>./run.sh</code> på Mac minin.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <span class="dev">Mac mini</span><h3>Bygg & ändra menyn</h3>
+      <p>Prata med systemet på svenska/kinesiska: "ta bort dagens lunch", "höj priset på ramen till 149".</p>
+      <a href="/builder/{{ project.id }}" target="_blank">Öppna builder</a>
+      <span class="path">/builder/{{ project.id }}</span>
+    </div>
+
+    <div class="card">
+      <span class="dev">Gästens telefon</span><h3>Beställ online</h3>
+      <p>Länk i Google-profil, Instagram-bio, QR på bordet. Förbeställ med hämttid.</p>
+      <a href="/site/{{ project.id }}" target="_blank">Öppna gästsidan</a>
+      <span class="path">/site/{{ project.id }}  ·  bord: /site/{{ project.id }}?table=NR</span>
+    </div>
+
+    <div class="card">
+      <span class="dev">Disk-iPad</span><h3>Kiosk — beställ vid disken</h3>
+      <p>Gästen beställer och betalar själv. Ersätter kassabiträdet i lugna tider.</p>
+      <a href="/kiosk/{{ project.id }}" target="_blank">Öppna kiosk</a>
+      <span class="path">/kiosk/{{ project.id }}</span>
+    </div>
+
+    {% for s in stations %}
+    <div class="card">
+      <span class="dev">Kök-iPad</span><h3>Köksskärm — {{ s }}</h3>
+      <p>Visar bara {{ s }}-rätter. Bongar dyker upp när betalning är klar.</p>
+      <a href="/kitchen/{{ project.id }}?station={{ s }}" target="_blank">Öppna {{ s }}</a>
+      <span class="path">/kitchen/{{ project.id }}?station={{ s }}</span>
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <span class="dev">Apple TV</span><h3>Gästskärm (TV)</h3>
+      <p>Ordernummer: "Tillagas" → "Klar för avhämtning". Öppna i Safari på Apple TV.</p>
+      <a href="/display/{{ project.id }}" target="_blank">Öppna TV-skärm</a>
+      <span class="path">/display/{{ project.id }}</span>
+    </div>
+
+    <div class="card">
+      <span class="dev">Reception / ägare</span><h3>Beställningar & kunder</h3>
+      <p>Alla ordrar, status, och återkommande stamkunder (CRM).</p>
+      <a href="/admin/{{ project.id }}/orders" target="_blank">Beställningar</a>
+      <span class="path">/admin/{{ project.id }}/orders  ·  /admin/{{ project.id }}/customers</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -267,6 +267,20 @@ def kitchen_status(project_id: str, order_id: str, body: FulfillmentUpdate):
     return {"ok": True}
 
 
+# ---------- Restaurant control panel (the operational hub) ----------
+
+@app.get("/panel/{project_id}", response_class=HTMLResponse)
+def panel(request: Request, project_id: str):
+    project = _project_or_404(project_id)
+    stations = sorted({it.get("station", "kitchen")
+                       for cat in project["spec"].get("menu", [])
+                       for it in cat.get("items", [])})
+    return templates.TemplateResponse(request, "panel.html", {
+        "project": project,
+        "stations": stations or ["kitchen"],
+    })
+
+
 # ---------- In-store iPad kiosk ----------
 
 @app.get("/kiosk/{project_id}", response_class=HTMLResponse)
