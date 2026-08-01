@@ -44,6 +44,8 @@ SITE_SCHEMA = _obj({
                     "name": {"type": "string"},
                     "description": {"type": "string"},
                     "price": {"type": "number"},
+                    "station": {"type": "string", "enum": ["kitchen", "sushi", "bar", "dessert"],
+                                "description": "which station prepares this — routes it to the right kitchen screen/printer. sushi/sashimi/maki/nigiri -> sushi; hot dishes -> kitchen; drinks -> bar; desserts -> dessert."},
                     "tags": {"type": "array", "items": {"type": "string"},
                              "description": "e.g. vegetarian, vegan, spicy, popular, gluten-free"},
                 }),

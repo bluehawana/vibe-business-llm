@@ -362,3 +362,52 @@ def test_receipt_page_renders(project_id):
 def test_kiosk_mode_renders(project_id):
     html = client.get(f"/kiosk/{project_id}").text
     assert "Beställ här" in html  # kiosk banner
+
+
+# ---------- kitchen station routing (hot line vs sushi bar) ----------
+
+def _sushi_spec(pid):
+    project = db.get_project(pid)
+    project["spec"]["menu"] = [{"category": "Mat", "items": [
+        {"id": "ramen", "name": "Ramen", "description": "", "price": 139, "station": "kitchen", "tags": []},
+        {"id": "nigiri", "name": "Nigiri 8", "description": "", "price": 129, "station": "sushi", "tags": []},
+        {"id": "cola", "name": "Cola", "description": "", "price": 25, "station": "bar", "tags": []},
+    ]}]
+    project["spec"]["services"]["dine_in"] = True
+    db.update_spec(pid, project["spec"])
+
+
+def test_station_routing_splits_order(project_id):
+    _sushi_spec(project_id)
+    r = checkout(project_id, mode="dine_in", table="3",
+                 items=[{"id": "ramen", "qty": 1}, {"id": "nigiri", "qty": 2}, {"id": "cola", "qty": 1}])
+    assert r.status_code == 200
+
+    # sushi station sees only the nigiri
+    sushi = client.get(f"/api/kitchen/{project_id}/orders?station=sushi").json()["orders"]
+    assert len(sushi) == 1
+    assert [i["id"] for i in sushi[0]["items"]] == ["nigiri"]
+
+    # hot kitchen sees only the ramen
+    kitchen = client.get(f"/api/kitchen/{project_id}/orders?station=kitchen").json()["orders"]
+    assert [i["id"] for i in kitchen[0]["items"]] == ["ramen"]
+
+    # bar sees only the cola
+    bar = client.get(f"/api/kitchen/{project_id}/orders?station=bar").json()["orders"]
+    assert [i["id"] for i in bar[0]["items"]] == ["cola"]
+
+    # unstationed view (no param) sees the whole order
+    allv = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
+    assert len(allv[0]["items"]) == 3
+
+
+def test_station_with_no_items_hides_order(project_id):
+    _sushi_spec(project_id)
+    checkout(project_id, mode="dine_in", table="4", items=[{"id": "nigiri", "qty": 1}])
+    # a sushi-only order must not appear on the hot-kitchen screen
+    kitchen = client.get(f"/api/kitchen/{project_id}/orders?station=kitchen").json()["orders"]
+    assert kitchen == []
+
+
+def test_tv_display_renders(project_id):
+    assert "Klar för avhämtning" in client.get(f"/display/{project_id}").text

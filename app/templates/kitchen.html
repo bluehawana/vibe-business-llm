@@ -34,12 +34,15 @@
 </head>
 <body>
 <header>
-  <h1>🍳 {{ project.name }} — kök</h1>
+  <h1>🍳 {{ project.name }} — <span id="stationlabel">kök</span></h1>
   <span class="sub">uppdateras automatiskt var 5:e sekund</span>
 </header>
 <div class="board" id="board"><p class="empty">Inga aktiva beställningar</p></div>
 <script>
 const PID = "{{ project.id }}";
+const STATION = new URLSearchParams(location.search).get("station") || "";
+const STATION_LABEL = { kitchen: "varm kök", sushi: "sushi", bar: "bar", dessert: "dessert" };
+if (STATION) document.getElementById("stationlabel").textContent = STATION_LABEL[STATION] || STATION;
 const MODE_LABEL = { pickup: "Avhämtning", delivery: "Leverans", dine_in: "Bord" };
 
 function age(ts) {
@@ -56,7 +59,8 @@ async function setStatus(oid, state) {
 }
 
 async function refresh() {
-  const res = await fetch(`/api/kitchen/${PID}/orders`);
+  const url = `/api/kitchen/${PID}/orders` + (STATION ? `?station=${STATION}` : "");
+  const res = await fetch(url);
   const { orders } = await res.json();
   const board = document.getElementById("board");
   if (!orders.length) {

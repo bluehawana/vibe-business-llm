@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ project.name }} — beställningar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #12140f; color: #f4f1e8;
+         display: flex; flex-direction: column; overflow: hidden; }
+  header { text-align: center; padding: 24px; }
+  header h1 { font-size: 3vw; font-weight: 700; }
+  header .name { color: #e0a11b; }
+  .cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #2a2c22; }
+  .col { background: #12140f; padding: 24px 32px; overflow-y: auto; }
+  .col h2 { font-size: 2vw; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 3px solid; }
+  .col.prep h2 { color: #e2b93b; border-color: #e2b93b; }
+  .col.ready h2 { color: #52b788; border-color: #52b788; }
+  .nums { display: flex; flex-wrap: wrap; gap: 16px; }
+  .num { font-size: 4vw; font-weight: 800; padding: 8px 24px; border-radius: 16px;
+         font-variant-numeric: tabular-nums; }
+  .col.prep .num { background: #2e2a14; color: #f0d570; }
+  .col.ready .num { background: #16321f; color: #6fe0a0; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .empty { opacity: .35; font-size: 1.4vw; margin-top: 12px; }
+</style>
+</head>
+<body>
+<header><h1>🍜 <span class="name">{{ project.name }}</span> — din beställning</h1></header>
+<div class="cols">
+  <div class="col prep"><h2>Tillagas</h2><div class="nums" id="prep"></div></div>
+  <div class="col ready"><h2>Klar för avhämtning</h2><div class="nums" id="ready"></div></div>
+</div>
+<script>
+const PID = "{{ project.id }}";
+async function refresh() {
+  const res = await fetch(`/api/kitchen/${PID}/orders`);
+  const { orders } = await res.json();
+  const prep = orders.filter(o => o.fulfillment === "new" || o.fulfillment === "preparing");
+  const ready = orders.filter(o => o.fulfillment === "ready");
+  const render = (el, list) => {
+    el.innerHTML = list.length
+      ? list.map(o => `<span class="num">${o.id.slice(0,4).toUpperCase()}</span>`).join("")
+      : '<p class="empty">—</p>';
+  };
+  render(document.getElementById("prep"), prep);
+  render(document.getElementById("ready"), ready);
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

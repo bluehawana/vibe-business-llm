@@ -25,6 +25,8 @@ colors matching the cuisine, opening hours typical for the business type) — bu
 invent prices for items the owner priced, and never delete things they added unless asked.
 - Menu item ids are stable kebab-case slugs. Keep existing ids unchanged when editing \
 an item; new dishes get new ids.
+- Set each item's `station` so it routes to the right kitchen screen: sushi/sashimi/maki/\
+nigiri/poke -> "sushi"; hot cooked dishes -> "kitchen"; drinks -> "bar"; desserts -> "dessert".
 - Default currency SEK and Swedish conventions when the business appears to be in Sweden.
 - Write all site-facing text (tagline, about, menu descriptions) in the site language; \
 write your `reply` in the same language the owner writes to you.

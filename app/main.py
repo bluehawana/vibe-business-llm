@@ -217,10 +217,41 @@ def kitchen(request: Request, project_id: str):
     })
 
 
+def _station_of(spec: dict) -> dict:
+    """Map each menu item id -> its kitchen station (from the current spec)."""
+    out = {}
+    for cat in spec.get("menu", []):
+        for it in cat.get("items", []):
+            out[it["id"]] = it.get("station", "kitchen")
+    return out
+
+
 @app.get("/api/kitchen/{project_id}/orders")
-def kitchen_orders(project_id: str):
-    _project_or_404(project_id)
-    return {"orders": db.get_active_orders(project_id)}
+def kitchen_orders(project_id: str, station: str = ""):
+    project = _project_or_404(project_id)
+    orders = db.get_active_orders(project_id)
+    if not station:
+        return {"orders": orders}
+    # Station routing: each station iPad sees only orders containing its items,
+    # and only those items on the ticket. Unknown/unrouted items (e.g. legacy
+    # menus with no station) show everywhere so nothing is silently dropped.
+    station_of = _station_of(project["spec"])
+    routed = []
+    for o in orders:
+        mine = [i for i in o["items"]
+                if i["id"] != "_delivery"
+                and station_of.get(i["id"], station) == station]
+        if mine:
+            routed.append({**o, "items": mine})
+    return {"orders": routed}
+
+
+@app.get("/display/{project_id}", response_class=HTMLResponse)
+def display(request: Request, project_id: str):
+    """Customer-facing order-status board for a TV (open in Safari on Apple TV):
+    shows order numbers moving from 'Tillagas' to 'Klar för avhämtning'."""
+    project = _project_or_404(project_id)
+    return templates.TemplateResponse(request, "display.html", {"project": project})
 
 
 @app.post("/api/kitchen/{project_id}/orders/{order_id}/status")
