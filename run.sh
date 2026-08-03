@@ -4,6 +4,8 @@
 set -e
 cd "$(dirname "$0")"
 
+PORT=${PORT:-8100}
+
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip install -q -r requirements.txt
 
@@ -31,9 +33,22 @@ if [ -n "$STRIPE_SECRET_KEY" ] && [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
   echo "     never confirmed, so those orders will never reach the kitchen."
 fi
 
+# "[errno 48] address already in use" tells you nothing useful at 18:00 on a
+# Friday. Name the process that has the port, so you know what to stop.
+BUSY=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t 2>/dev/null | head -1)
+if [ -n "$BUSY" ]; then
+  echo ""
+  echo "  Port $PORT is already in use by PID $BUSY:"
+  ps -o pid=,command= -p "$BUSY" | sed 's/^/    /'
+  echo ""
+  echo "  If that is an older copy of this server, stop it with:  kill $BUSY"
+  echo "  Then run ./run.sh again."
+  exit 1
+fi
+
 IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "<mac-mini-ip>")
 echo ""
 echo "  Vibe Business is starting."
-echo "  On the iPads / Apple TV, open:  http://$IP:8100/panel/<project-id>"
+echo "  On the iPads / Apple TV, open:  http://$IP:$PORT/panel/<project-id>"
 echo ""
-exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8100
+exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
