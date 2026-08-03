@@ -12,17 +12,32 @@ builds signed with your own developer account; neither goes near the App Store.
 
 ```bash
 cd apps
-xcodegen generate          # writes Ichiban.xcodeproj from project.yml
+./generate.sh              # writes Ichiban.xcodeproj from project.yml
 open Ichiban.xcodeproj
 ```
 
-Set your Team under Signing & Capabilities for each target, then Run.
+`generate.sh` reads `APPLE_TEAM_ID` from `../.env` and sets the signing team on
+both targets, so a regenerated project is ready to run instead of needing the
+team picked by hand twice. Find the ID at
+developer.apple.com → Membership (a 10-character string like `A1B2C3D4E5`).
 
-The tvOS target needs the tvOS platform installed:
+The tvOS target needs the tvOS platform installed once:
 
 ```bash
-xcodebuild -downloadPlatform tvOS      # ~5 GB, one time
+xcodebuild -downloadPlatform tvOS      # ~5 GB
 ```
+
+## Installing on the real Apple TV
+
+1. Apple TV: Settings → Remotes and Devices → **Remote App and Devices** (leave
+   this screen open — it listens for the pairing request)
+2. Xcode: Window → Devices and Simulators → the Apple TV appears → **Pair**,
+   type the code shown on the TV
+3. Both on the same wifi as the Mac
+4. Select `IchibanBoard` + your Apple TV, Run
+5. First launch: press **Play/Pause** on the remote, enter the server address
+
+Same for the iPads with `IchibanScreens`, over USB or wifi.
 
 ## Setting up a device
 

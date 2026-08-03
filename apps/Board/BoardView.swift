@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The guest board, read from across a dining room. Same two columns as the web
 /// version: numbers move Preparing → Ready and pulse while they're new.
@@ -72,7 +75,14 @@ struct BoardView: View {
             if orders.isEmpty {
                 Text("—").font(.system(size: 40)).foregroundStyle(.white.opacity(0.25))
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: big ? 220 : 170), spacing: 20)],
+                // Wide enough for four digits at this size — a number that wraps
+                // to two lines ("10" over "3") is a number a guest misreads.
+                // A maximum as well as a minimum: without it the grid stretches
+                // cells to fill the column and numbers drift apart, which reads
+                // as "these are unrelated" from across a room.
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: big ? 280 : 210,
+                                                       maximum: big ? 300 : 230),
+                                             spacing: 24, alignment: .leading)],
                           alignment: .leading, spacing: 20) {
                     ForEach(orders) { order in
                         numberTile(order, tint: tint, big: big)
@@ -90,6 +100,8 @@ struct BoardView: View {
         Text(order.order_no)
             .font(.system(size: big ? 96 : 72, weight: .heavy, design: .rounded))
             .monospacedDigit()
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(big ? Color(red: 0.55, green: 0.94, blue: 0.71)
                                  : Color(red: 0.94, green: 0.84, blue: 0.44))
             .padding(.horizontal, 28).padding(.vertical, 10)

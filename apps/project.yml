@@ -30,6 +30,9 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
+        # Filled from APPLE_TEAM_ID in ../.env by ./generate.sh, so a regenerated
+        # project never means picking the team by hand on two targets again.
+        DEVELOPMENT_TEAM: ${APPLE_TEAM_ID}
 
   # The four iPads. iOS does have WebKit, so each screen is the web page it
   # already serves — a fix reaches every iPad on the next load, no rebuild.
@@ -60,3 +63,4 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "2"
+        DEVELOPMENT_TEAM: ${APPLE_TEAM_ID}
