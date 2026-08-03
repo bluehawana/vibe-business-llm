@@ -731,3 +731,19 @@ def test_thin_payload_endpoint_is_a_harmless_no_op(project_id, monkeypatch):
     r = guest.post("/api/stripe/webhook", content=payload,
                    headers=signed_webhook(payload, "whsec_one"))
     assert r.status_code == 200
+
+
+def test_shop_domain_serves_its_own_menu_at_root(project_id, monkeypatch):
+    """order.ichiban.biz should be the menu, not a project id on a QR code."""
+    monkeypatch.setattr(main, "HOME_PROJECT", project_id)
+    r = guest.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == f"/site/{project_id}"
+    assert "Testkrogen" in guest.get("/").text
+
+
+def test_root_falls_back_to_the_platform_page(project_id, monkeypatch):
+    monkeypatch.setattr(main, "HOME_PROJECT", "")
+    assert guest.get("/").status_code == 200
+    # a stale id must not take the whole site down with a redirect loop
+    monkeypatch.setattr(main, "HOME_PROJECT", "deleted-project")
+    assert guest.get("/", follow_redirects=False).status_code == 200

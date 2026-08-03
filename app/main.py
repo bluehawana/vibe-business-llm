@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from urllib.parse import quote
 
@@ -13,6 +14,10 @@ from .schema import DEFAULT_SPEC, find_menu_item
 
 app = FastAPI(title="Vibe Business")
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
+
+# A single-restaurant install serves that restaurant at "/" instead of the
+# platform landing page. Empty = multi-tenant, as before.
+HOME_PROJECT = os.environ.get("VIBE_HOME_PROJECT", "")
 
 db.init_db()
 
@@ -100,6 +105,11 @@ def _project_or_404(project_id: str) -> dict:
 
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
+    """On a shop's own domain, "/" should be that shop's menu — order.ichiban.biz
+    is what goes on a QR code and in an Instagram bio, not a project id nobody
+    can read out loud. Unset, this stays the platform landing page."""
+    if HOME_PROJECT and db.get_project(HOME_PROJECT):
+        return RedirectResponse(f"/site/{HOME_PROJECT}", status_code=307)
     return templates.TemplateResponse(request, "landing.html", {})
 
 
