@@ -19,6 +19,8 @@
             display: flex; align-items: center; gap: .6vw; }
   .col.prep h2 { color: #e2b93b; border-color: #e2b93b; }
   .col.ready h2 { color: #52b788; border-color: #52b788; }
+  /* Half the guests walk over from the Liseberg hotels — both languages, always. */
+  .col h2 .en { font-size: .72em; font-weight: 400; opacity: .62; }
   .nums { display: flex; flex-wrap: wrap; gap: 1.2vw 1vw; align-content: flex-start; overflow: hidden; }
   .num { font-weight: 800; font-variant-numeric: tabular-nums; border-radius: 14px;
          padding: .5vh 1.6vw; line-height: 1.15; }
@@ -36,8 +38,10 @@
 <body>
 <header><h1>🍜 <span class="name">{{ project.name }}</span></h1></header>
 <div class="cols">
-  <div class="col prep"><h2>👨‍🍳 Tillagas</h2><div class="nums" id="prep"></div></div>
-  <div class="col ready"><h2>✅ Klar — hämta din mat</h2><div class="nums" id="ready"></div></div>
+  <div class="col prep"><h2>👨‍🍳 Tillagas <span class="en">Preparing</span></h2>
+    <div class="nums" id="prep"></div></div>
+  <div class="col ready"><h2>✅ Klar <span class="en">Ready — collect your food</span></h2>
+    <div class="nums" id="ready"></div></div>
 </div>
 <footer>Ditt nummer står på kvittot · Your number is on your receipt</footer>
 <script>

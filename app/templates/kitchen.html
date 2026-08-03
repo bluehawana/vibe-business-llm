@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kök — {{ project.name }}</title>
+<title>Kitchen — {{ project.name }}</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #1c1e22; color: #eceae4; padding: 16px; }
@@ -36,20 +36,20 @@
 </head>
 <body>
 <header>
-  <h1>🍳 {{ project.name }} — <span id="stationlabel">kök</span></h1>
-  <span class="sub">uppdateras automatiskt var 5:e sekund</span>
+  <h1>🍳 {{ project.name }} — <span id="stationlabel">kitchen</span></h1>
+  <span class="sub">refreshes automatically every 5 seconds</span>
 </header>
-<div class="board" id="board"><p class="empty">Inga aktiva beställningar</p></div>
+<div class="board" id="board"><p class="empty">No active orders</p></div>
 <script>
 const PID = "{{ project.id }}";
 const STATION = new URLSearchParams(location.search).get("station") || "";
-const STATION_LABEL = { kitchen: "varm kök", sushi: "sushi", bar: "bar", dessert: "dessert" };
+const STATION_LABEL = { kitchen: "hot kitchen", sushi: "sushi bar", bar: "bar", dessert: "dessert" };
 if (STATION) document.getElementById("stationlabel").textContent = STATION_LABEL[STATION] || STATION;
-const MODE_LABEL = { pickup: "Avhämtning", delivery: "Leverans", dine_in: "Bord" };
+const MODE_LABEL = { pickup: "Take away", delivery: "Delivery", dine_in: "Eat in" };
 
 function age(ts) {
   const m = Math.floor((Date.now()/1000 - ts) / 60);
-  return m < 1 ? "nu" : m + " min";
+  return m < 1 ? "now" : m + " min";
 }
 
 async function setStatus(oid, state) {
@@ -66,23 +66,23 @@ async function refresh() {
   const { orders } = await res.json();
   const board = document.getElementById("board");
   if (!orders.length) {
-    board.innerHTML = '<p class="empty">Inga aktiva beställningar</p>';
+    board.innerHTML = '<p class="empty">No active orders</p>';
     return;
   }
   board.innerHTML = orders.map(o => {
     const modeTxt = MODE_LABEL[o.customer.mode] || o.customer.mode;
-    const where = o.customer.mode === "dine_in" ? `Bord ${o.customer.table}`
+    const where = o.customer.mode === "dine_in" ? `Table ${o.customer.table}`
                 : o.customer.mode === "delivery" ? o.customer.address : "";
     const when = o.customer.mode !== "dine_in" && o.customer.pickup_time
                 ? ` · ${o.customer.pickup_time}` : "";
     const next = o.fulfillment === "new"
-      ? `<button class="b-prep" onclick="setStatus('${o.id}','preparing')">Börja laga →</button>`
+      ? `<button class="b-prep" onclick="setStatus('${o.id}','preparing')">Start cooking →</button>`
       : o.fulfillment === "preparing"
-      ? `<button class="b-ready" onclick="setStatus('${o.id}','ready')">Klar ✓</button>`
-      : `<button class="b-done" onclick="setStatus('${o.id}','completed')">Utlämnad ✓✓</button>`;
+      ? `<button class="b-ready" onclick="setStatus('${o.id}','ready')">Ready ✓</button>`
+      : `<button class="b-done" onclick="setStatus('${o.id}','completed')">Handed over ✓✓</button>`;
     return `<div class="card ${o.fulfillment}">
       <div class="head"><span class="oid">#${o.order_no ?? o.id.slice(0,4).toUpperCase()}</span>
-        ${o.status === "unpaid" ? '<span class="unpaid">ej betald</span>' : ""}
+        ${o.status === "unpaid" ? '<span class="unpaid">not paid</span>' : ""}
         <span class="age">${age(o.created_at)}</span></div>
       <span class="mode ${o.customer.mode}">${modeTxt}${where ? " · " + where : ""}${when}</span>
       ${o.items.filter(i => i.id !== "_delivery").map(i =>

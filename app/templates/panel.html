@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ project.name }} — kontrollpanel</title>
+<title>{{ project.name }} — control panel</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #faf7f0; color: #2b2a26; padding: 28px 20px; }
@@ -26,71 +26,71 @@
 <body>
 <div class="wrap">
   <h1>🎛️ {{ project.name }}</h1>
-  <p class="sub">Kontrollpanel — öppna rätt skärm på rätt enhet</p>
+  <p class="sub">Control panel — open the right screen on the right device</p>
   <div class="host">
-    På iPads och Apple TV i restaurangen: ersätt <code>denna adress</code> med Mac minins adress på wifi,
-    t.ex. <code>http://192.168.1.50:8100</code>. Kör servern med <code>./run.sh</code> på Mac minin.
+    On the iPads and Apple TV: replace <code>this address</code> with the Mac mini's address on the
+    network, e.g. <code>http://192.168.1.50:8100</code>. Start the server with <code>./run.sh</code>.
   </div>
 
   <div class="grid">
     <div class="card">
-      <span class="dev">Mac mini</span><h3>Bygg & ändra menyn</h3>
-      <p>Prata med systemet på svenska/kinesiska: "ta bort dagens lunch", "höj priset på ramen till 149".</p>
-      <a href="/builder/{{ project.id }}" target="_blank">Öppna builder</a>
+      <span class="dev">Mac mini</span><h3>Build & edit the menu</h3>
+      <p>Talk to it in Swedish, Chinese or English: "remove today's lunch", "raise the ramen price to 149".</p>
+      <a href="/builder/{{ project.id }}" target="_blank">Open builder</a>
       <span class="path">/builder/{{ project.id }}</span>
     </div>
 
     <div class="card">
-      <span class="dev">Gästens telefon</span><h3>Beställ online</h3>
-      <p>Länk i Google-profil, Instagram-bio, QR på bordet. Förbeställ med hämttid.</p>
-      <a href="/site/{{ project.id }}" target="_blank">Öppna gästsidan</a>
+      <span class="dev">Guest phone</span><h3>Order online</h3>
+      <p>Link from your Google profile, Instagram bio, or a table QR. Pre-order with a pickup time.</p>
+      <a href="/site/{{ project.id }}" target="_blank">Open guest site</a>
       <span class="path">/site/{{ project.id }}  ·  bord: /site/{{ project.id }}?table=NR</span>
     </div>
 
     <div class="card">
-      <span class="dev">iPad 1 — receptionen</span><h3>Kiosk — gästen beställer själv</h3>
-      <p>Gästen väljer äta här eller ta med, betalar med kort/Swish direkt, och får ett nummer.
-         Ingen bemannad kassa.</p>
-      <a href="/kiosk/{{ project.id }}" target="_blank">Öppna kiosk</a>
+      <span class="dev">iPad 1 — reception</span><h3>Kiosk — the guest orders themselves</h3>
+      <p>Guest picks eat in or take away, pays by card/Swish there and then, and gets a number.
+         No staffed till.</p>
+      <a href="/kiosk/{{ project.id }}" target="_blank">Open kiosk</a>
       <span class="path">/kiosk/{{ project.id }}</span>
     </div>
 
     <div class="card">
-      <span class="dev">iPad 1 — Zettle-terminalen</span><h3>Att betala i restaurangen</h3>
-      <p>För gäster som vill betala fysiskt: visar beloppet att ta på Zettle-läsaren, ett tryck för
-         "Betald". Zettle är det certifierade kassaregistret — kvittot kommer därifrån.</p>
-      <a href="/counter/{{ project.id }}" target="_blank">Öppna kassaskärm</a>
+      <span class="dev">iPad 1 — Zettle reader</span><h3>Paying in the restaurant</h3>
+      <p>For guests who want to pay physically: shows the amount to charge on the Zettle reader, one tap
+         for "Paid". Zettle is the certified cash register — the receipt comes from there.</p>
+      <a href="/counter/{{ project.id }}" target="_blank">Open pay screen</a>
       <span class="path">/counter/{{ project.id }}</span>
     </div>
 
     {% for s in stations %}
     <div class="card">
-      <span class="dev">Kök-iPad — {{ s }}</span><h3>Köksskärm — {{ s }}</h3>
-      <p>Visar bara {{ s }}-rätter, med ordernumret överst. Tryck "Klar" så visas numret på TV:n.</p>
-      <a href="/kitchen/{{ project.id }}?station={{ s }}" target="_blank">Öppna {{ s }}</a>
+      <span class="dev">Kitchen iPad — {{ s }}</span><h3>Kitchen screen — {{ s }}</h3>
+      <p>Shows only {{ s }} dishes, order number on top. Tap "Ready" and the number appears on the TV.</p>
+      <a href="/kitchen/{{ project.id }}?station={{ s }}" target="_blank">Open {{ s }}</a>
       <span class="path">/kitchen/{{ project.id }}?station={{ s }}</span>
     </div>
     {% endfor %}
 
     <div class="card">
-      <span class="dev">Apple TV</span><h3>Gästskärm (TV)</h3>
-      <p>Numren vandrar "Tillagas" → "Klar — hämta din mat", som hos Max. Öppna i Safari på Apple TV.</p>
-      <a href="/display/{{ project.id }}" target="_blank">Öppna TV-skärm</a>
+      <span class="dev">Apple TV</span><h3>Guest board (TV)</h3>
+      <p>Numbers move Preparing → Ready, like at Max. Open in Safari on the Apple TV.</p>
+      <a href="/display/{{ project.id }}" target="_blank">Open TV board</a>
       <span class="path">/display/{{ project.id }}</span>
     </div>
 
     <div class="card">
-      <span class="dev">iPad 2 — receptionen</span><h3>Utlämning — vart maten ska</h3>
-      <p>Klar mat delas i två spalter: bär ut till bordet, eller packa i påse och ropa numret.
-         Påsetiketten skrivs ut med nummer och namn.</p>
-      <a href="/pass/{{ project.id }}" target="_blank">Öppna receptionsskärm</a>
+      <span class="dev">iPad 2 — reception</span><h3>Hand-out — where the food goes</h3>
+      <p>Ready food in two columns: carry to the table, or bag it and call the number. The bag label
+         prints with the number and the name.</p>
+      <a href="/pass/{{ project.id }}" target="_blank">Open reception screen</a>
       <span class="path">/pass/{{ project.id }}</span>
     </div>
 
     <div class="card">
-      <span class="dev">Ägare</span><h3>Beställningar & kunder</h3>
-      <p>Alla ordrar, status, och återkommande stamkunder (CRM).</p>
-      <a href="/admin/{{ project.id }}/orders" target="_blank">Beställningar</a>
+      <span class="dev">Owner</span><h3>Orders & customers</h3>
+      <p>All orders, their status, and repeat customers (CRM).</p>
+      <a href="/admin/{{ project.id }}/orders" target="_blank">Orders</a>
       <span class="path">/admin/{{ project.id }}/orders  ·  /admin/{{ project.id }}/customers</span>
     </div>
   </div>

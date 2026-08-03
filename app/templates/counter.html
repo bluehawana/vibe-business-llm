@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kassa — {{ project.name }}</title>
+<title>Pay — {{ project.name }}</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #14160f; color: #f4f1e8;
@@ -31,26 +31,26 @@
 </head>
 <body>
 <header>
-  <h1>💳 {{ project.name }} — att betala</h1>
-  <span class="sub">uppdateras var 3:e sekund</span>
+  <h1>💳 {{ project.name }} — to be paid</h1>
+  <span class="sub">refreshes every 3 seconds</span>
 </header>
 <div class="note">
-  Ta betalt på Zettle-terminalen med beloppet nedan, tryck sedan <b>Betald</b>.
-  Zettle är det certifierade kassaregistret — kvittot kommer därifrån, inte härifrån.
+  Charge the amount below on the Zettle reader, then tap <b>Paid</b>.
+  Zettle is the certified cash register — the receipt comes from there, not from here.
 </div>
-<div class="board" id="board"><p class="empty">Inget att betala just nu</p></div>
+<div class="board" id="board"><p class="empty">Nothing to be paid right now</p></div>
 <script>
 const PID = "{{ project.id }}";
-const MODE_LABEL = { pickup: "Ta med", delivery: "Leverans", dine_in: "Äta här" };
+const MODE_LABEL = { pickup: "Take away", delivery: "Delivery", dine_in: "Eat in" };
 
 function age(ts) {
   const m = Math.floor((Date.now() / 1000 - ts) / 60);
-  return m < 1 ? "nu" : m + " min";
+  return m < 1 ? "now" : m + " min";
 }
 
 async function settle(id, btn) {
   btn.disabled = true;
-  btn.textContent = "Sparar…";
+  btn.textContent = "Saving…";
   await fetch(`/api/admin/${PID}/orders/${id}/settle`, { method: "POST" });
   refresh();
 }
@@ -60,12 +60,12 @@ async function refresh() {
   const { orders } = await res.json();
   const board = document.getElementById("board");
   if (!orders.length) {
-    board.innerHTML = '<p class="empty">Inget att betala just nu</p>';
+    board.innerHTML = '<p class="empty">Nothing to be paid right now</p>';
     return;
   }
   board.innerHTML = orders.map(o => {
     const where = o.customer.mode === "dine_in" && o.customer.table
-      ? ` · bord ${o.customer.table}` : "";
+      ? ` · table ${o.customer.table}` : "";
     return `<div class="card">
       <div class="top">
         <span class="no">${o.order_no ?? o.id.slice(0, 4).toUpperCase()}</span>
@@ -75,7 +75,7 @@ async function refresh() {
       <div class="amt">${o.total.toFixed(0)} ${o.currency}</div>
       <div class="lines">${o.items.filter(i => i.id !== "_delivery")
         .map(i => `<div>${i.qty}× ${i.name}</div>`).join("")}</div>
-      <button onclick="settle('${o.id}', this)">Betald på Zettle ✓</button>
+      <button onclick="settle('${o.id}', this)">Paid on Zettle ✓</button>
     </div>`;
   }).join("");
 }

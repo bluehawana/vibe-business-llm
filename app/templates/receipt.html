@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nummer {{ order_no }}</title>
+<title>Number {{ order_no }}</title>
 <style>
   body { font-family: 'Courier New', monospace; background: #eee; margin: 0; padding: 20px; }
   .paper { background: #fff; width: 320px; margin: 0 auto 16px; padding: 16px; white-space: pre;
@@ -20,11 +20,11 @@
 </head>
 <body>
 <div class="bar">
-  <button class="print" onclick="window.print()">🖨️ Skriv ut</button>
+  <button class="print" onclick="window.print()">🖨️ Print</button>
 </div>
-<p class="klabel">Gästens nummerlapp</p>
+<p class="klabel">Guest slip</p>
 <div class="paper">{{ receipt_text }}</div>
-<p class="klabel">Köksbong</p>
+<p class="klabel">Kitchen ticket</p>
 <div class="paper">{{ kitchen_text }}</div>
 </body>
 </html>

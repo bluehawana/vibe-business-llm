@@ -256,7 +256,7 @@ def test_kitchen_flow(project_id):
 
 
 def test_kitchen_page_renders(project_id):
-    assert "kök" in client.get(f"/kitchen/{project_id}").text
+    assert "Kitchen" in client.get(f"/kitchen/{project_id}").text
 
 
 # ---------- pickup time (tourist pre-order use case) ----------
@@ -349,15 +349,15 @@ def test_cloudprnt_poll_serve_confirm(project_id):
     # printer fetches the job -> plain text with table + items
     job = client.get(f"/api/cloudprnt/{project_id}")
     assert job.status_code == 200
-    assert "Bord:" in job.text and "12" in job.text
+    assert "Table:" in job.text and "12" in job.text
     assert "Margherita" in job.text
-    assert "EJ BETALD" in job.text  # settles on the Zettle reader
+    assert "NOT PAID" in job.text  # settles on the Zettle reader
 
     # a kitchen-only printer gets the ticket without the guest's slip
     kitchen_only = client.get(f"/api/cloudprnt/{project_id}?role=kitchen").text
     assert "KÖK" in kitchen_only and "BESTÄLLNING" not in kitchen_only
     # eat-here food goes on a plate, so no bag label is printed for it
-    assert "TA MED / TAKE AWAY" not in kitchen_only
+    assert "TAKE AWAY BAG" not in kitchen_only
 
     # printer confirms -> job no longer offered
     assert client.delete(f"/api/cloudprnt/{project_id}?token={order_id}").status_code == 200
@@ -370,21 +370,21 @@ def test_takeaway_prints_a_bag_label_with_number_and_name(project_id):
                  customer_name="Yan")
     no = str(db.get_order(order_id_of(r))["order_no"])
     job = client.get(f"/api/cloudprnt/{project_id}").text
-    assert "TA MED / TAKE AWAY" in job
-    label = job.split("TA MED / TAKE AWAY")[1]
+    assert "TAKE AWAY BAG" in job
+    label = job.split("TAKE AWAY BAG")[1]
     assert no in label and "YAN" in label
 
 
 def test_reception_screen_splits_tables_from_bags(project_id):
     html = client.get(f"/pass/{project_id}").text
-    assert "Bär ut till bordet" in html and "Packa i påse" in html
+    assert "Carry to the table" in html and "Bag it" in html
 
 
 def test_receipt_page_renders(project_id):
     r = checkout(project_id)
     order_id = r.json()["url"].split("order=")[1].split("&")[0]
     html = client.get(f"/receipt/{order_id}").text
-    assert "Gästens nummerlapp" in html and "Köksbong" in html and "SUMMA" in html
+    assert "Guest slip" in html and "Kitchen ticket" in html and "TOTAL" in html
 
 
 # ---------- in-store iPad kiosk ----------
@@ -440,7 +440,10 @@ def test_station_with_no_items_hides_order(project_id):
 
 
 def test_tv_display_renders(project_id):
-    assert "Klar — hämta din mat" in client.get(f"/display/{project_id}").text
+    # the TV is the one screen every guest reads — both languages, always
+    tv = client.get(f"/display/{project_id}").text
+    assert "Tillagas" in tv and "Preparing" in tv
+    assert "Klar" in tv and "Ready — collect your food" in tv
 
 
 # ---------- one flow, two payment lanes, for eat-here AND take-away ----------

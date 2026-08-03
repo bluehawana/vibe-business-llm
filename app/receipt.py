@@ -13,7 +13,12 @@ kassaregister. Our slip for those orders is a ticket, not a receipt, and says so
 
 WIDTH = 42
 
-MODE_LABEL = {"pickup": "TA MED", "delivery": "LEVERANS", "dine_in": "ÄTA HÄR"}
+# Paper is read by guests, and a lot of them walk over from the Liseberg hotels
+# without a word of Swedish. Every line a guest acts on is printed in both
+# languages; the kitchen's own ticket stays short and English.
+MODE_LABEL = {"pickup": "TA MED / TAKE AWAY",
+              "delivery": "LEVERANS / DELIVERY",
+              "dine_in": "ÄTA HÄR / EAT IN"}
 
 
 def _line(char: str = "-") -> str:
@@ -40,7 +45,7 @@ def order_no(order: dict) -> str:
 
 def _big_number(order: dict) -> list[str]:
     """The number, unmissable across a room, on paper the guest is holding."""
-    return [_center("NUMMER"), _center(order_no(order)), _line("=")]
+    return [_center("NUMMER / NUMBER"), _center(order_no(order)), _line("=")]
 
 
 def kitchen_ticket(order: dict, business_name: str) -> str:
@@ -54,10 +59,10 @@ def kitchen_ticket(order: dict, business_name: str) -> str:
         _row("", MODE_LABEL.get(mode, mode.upper())),
     ]
     if mode == "dine_in" and c.get("table"):
-        lines.append(_row("Bord:", c["table"]))
+        lines.append(_row("Table:", c["table"]))
     elif mode == "delivery":
-        lines.append("Leverans: " + c.get("address", ""))
-    lines.append(_row("Tid:", c.get("pickup_time", "ASAP")))
+        lines.append("Delivery: " + c.get("address", ""))
+    lines.append(_row("Time:", c.get("pickup_time", "ASAP")))
     lines.append(_line())
     for it in order["items"]:
         if it["id"] == "_delivery":
@@ -65,14 +70,14 @@ def kitchen_ticket(order: dict, business_name: str) -> str:
         lines.append(f"{it['qty']} x {it['name']}")
     lines.append(_line())
     if c.get("name"):
-        lines.append(_row("Kund:", c["name"]))
+        lines.append(_row("Guest:", c["name"]))
     if c.get("phone"):
-        lines.append(_row("Tel:", c["phone"]))
+        lines.append(_row("Phone:", c["phone"]))
     if order.get("status") == "paid":
-        via = {"stripe": "BETALD ONLINE", "zettle": "BETALD I KORTTERMINAL"}
-        lines.append(_center(via.get(order.get("paid_via", ""), "BETALD / PAID")))
+        via = {"stripe": "PAID ONLINE", "zettle": "PAID ON CARD READER"}
+        lines.append(_center(via.get(order.get("paid_via", ""), "PAID")))
     else:
-        lines.append(_center("EJ BETALD — BETALAS I KORTTERMINALEN"))
+        lines.append(_center("NOT PAID — PAYS ON THE CARD READER"))
     return "\n".join(lines) + "\n\n\n"
 
 
@@ -90,26 +95,28 @@ def guest_slip(order: dict, business_name: str, contact: dict) -> str:
     lines += [_line("="), *_big_number(order)]
     lines.append(_center(MODE_LABEL.get(order["customer"].get("mode", "pickup"), "")))
     lines.append(_line())
-    lines.append(_center("KVITTO" if paid_online else "BESTÄLLNING"))
+    lines.append(_center("KVITTO / RECEIPT" if paid_online else "BESTÄLLNING / ORDER"))
     lines.append(_line())
     for it in order["items"]:
         name = "Leverans" if it["id"] == "_delivery" else it["name"]
         lines.append(_row(f"{it['qty']} x {name}", f"{it['price'] * it['qty']:.0f}"))
     lines.append(_line())
-    lines.append(_row("SUMMA", f"{order['total']:.0f} {cur}"))
+    lines.append(_row("SUMMA / TOTAL", f"{order['total']:.0f} {cur}"))
     if paid_online:
         # We took this money at a distance, so we account for the VAT here.
-        lines.append(_row("varav moms 12%", f"{order['total'] * 12 / 112:.2f} {cur}"))
+        lines.append(_row("varav moms / incl. VAT 12%", f"{order['total'] * 12 / 112:.2f} {cur}"))
         lines.append(_line())
-        lines.append(_center("Betald online"))
+        lines.append(_center("Betald online / Paid online"))
     else:
         lines.append(_line())
         lines.append(_center("BETALA I KORTTERMINALEN"))
-        lines.append(_center("Kvitto får du från terminalen"))
+        lines.append(_center("PAY ON THE CARD READER"))
+        lines.append(_center("Kvitto får du därifrån"))
+        lines.append(_center("Your receipt comes from the reader"))
     lines.append(_line())
-    lines.append(_center("Håll koll på skärmen — vi ropar"))
-    lines.append(_center(f"ditt nummer {order_no(order)} när maten är klar"))
-    lines.append(_center("Tack för ditt besök!"))
+    lines.append(_center(f"Vi ropar nummer {order_no(order)} när maten är klar"))
+    lines.append(_center(f"We'll call number {order_no(order)} when it's ready"))
+    lines.append(_center("Tack! / Thank you!"))
     return "\n".join(lines) + "\n\n\n"
 
 
@@ -120,7 +127,7 @@ def bag_label(order: dict) -> str:
     c = order["customer"]
     lines = [
         _line("="),
-        _center("TA MED / TAKE AWAY"),
+        _center("TAKE AWAY BAG / PÅSE"),
         *_big_number(order),
     ]
     if c.get("name"):
@@ -129,7 +136,7 @@ def bag_label(order: dict) -> str:
         lines.append(_center(c["phone"]))
     when = c.get("pickup_time", "ASAP")
     if when and when != "ASAP":
-        lines.append(_center(f"Hämtas {when}"))
+        lines.append(_center(f"Hämtas / Pickup {when}"))
     lines.append(_line("="))
     return "\n".join(lines) + "\n\n\n"
 

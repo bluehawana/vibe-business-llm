@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -43,23 +43,23 @@
 <body>
 <header>
   <h1>🛎️ {{ project.name }} — reception</h1>
-  <span class="sub">Klar mat: vart den ska. Uppdateras var 3:e sekund.</span>
+  <span class="sub">Food that is ready: where it goes. Refreshes every 3 seconds.</span>
 </header>
 <div class="cols">
-  <div class="col table"><h2>🍽️ Bär ut till bordet</h2><div id="tables"></div></div>
-  <div class="col bag"><h2>🥡 Packa i påse — ropa numret</h2><div id="bags"></div></div>
+  <div class="col table"><h2>🍽️ Carry to the table</h2><div id="tables"></div></div>
+  <div class="col bag"><h2>🥡 Bag it — call the number</h2><div id="bags"></div></div>
 </div>
 <script>
 const PID = "{{ project.id }}";
 
 function age(ts) {
   const m = Math.floor((Date.now() / 1000 - ts) / 60);
-  return m < 1 ? "nu" : m + " min";
+  return m < 1 ? "now" : m + " min";
 }
 
 async function done(id, btn) {
   btn.disabled = true;
-  btn.textContent = "Sparar…";
+  btn.textContent = "Saving…";
   await fetch(`/api/kitchen/${PID}/orders/${id}/status`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ state: "completed" }),
@@ -71,13 +71,13 @@ function card(o, kind) {
   const c = o.customer;
   const no = o.order_no ?? o.id.slice(0, 4).toUpperCase();
   const dest = kind === "table"
-    ? (c.table ? `Bord ${c.table}` : "Äta här")
-    : (c.mode === "delivery" ? `Leverans · ${c.address || ""}` : "Ta med");
+    ? (c.table ? `Table ${c.table}` : "Eat in")
+    : (c.mode === "delivery" ? `Delivery · ${c.address || ""}` : "Take away");
   const who = [c.name, c.phone].filter(Boolean).join(" · ");
-  const when = c.pickup_time && c.pickup_time !== "ASAP" ? ` · hämtas ${c.pickup_time}` : "";
+  const when = c.pickup_time && c.pickup_time !== "ASAP" ? ` · pickup ${c.pickup_time}` : "";
   // Reception must not hand over food that hasn't been paid for.
   const unpaid = o.status === "unpaid"
-    ? '<span class="warn">Ej betald — betalas i terminalen</span>' : "";
+    ? '<span class="warn">Not paid — pays on the reader</span>' : "";
   return `<div class="card">
     <div class="top">
       <span class="no">${no}</span>
@@ -88,7 +88,7 @@ function card(o, kind) {
     <div class="lines">${o.items.filter(i => i.id !== "_delivery")
       .map(i => `<div>${i.qty}× ${i.name}</div>`).join("")}</div>
     ${unpaid}
-    <button onclick="done('${o.id}', this)">Utlämnad ✓</button>
+    <button onclick="done('${o.id}', this)">Handed over ✓</button>
   </div>`;
 }
 
@@ -103,7 +103,7 @@ async function refresh() {
   const render = (el, list) => {
     el.innerHTML = list.length
       ? list.map(o => card(o, el.id === "tables" ? "table" : "bag")).join("")
-      : '<p class="empty">Inget klart just nu</p>';
+      : '<p class="empty">Nothing ready right now</p>';
   };
   render(document.getElementById("tables"), toTable);
   render(document.getElementById("bags"), toBag);
