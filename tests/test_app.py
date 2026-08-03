@@ -776,3 +776,10 @@ def test_tv_board_leaks_no_customer_data(project_id):
 
 def test_staff_order_feed_still_needs_a_login(project_id):
     assert guest.get(f"/api/kitchen/{project_id}/orders").status_code == 401
+
+
+def test_display_order_no_is_always_a_string(project_id):
+    """A typed client can't decode a field that is sometimes int, sometimes str."""
+    checkout(project_id, payment="in_store", kiosk=True)
+    orders = guest.get(f"/api/display/{project_id}").json()["orders"]
+    assert orders and all(isinstance(o["order_no"], str) for o in orders)

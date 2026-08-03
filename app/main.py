@@ -367,7 +367,9 @@ def display_board(project_id: str):
     carries names, phone numbers and addresses, which is why it needs a login and
     why the board must not simply reuse it."""
     _project_or_404(project_id)
-    return {"orders": [{"order_no": o["order_no"] or o["id"][:4].upper(),
+    # Always a string, never sometimes-int: a typed client (the tvOS board)
+    # cannot decode a field that changes shape between rows.
+    return {"orders": [{"order_no": str(o["order_no"] or o["id"][:4].upper()),
                         "fulfillment": o["fulfillment"]}
                        for o in db.get_active_orders(project_id)]}
 

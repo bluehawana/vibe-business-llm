@@ -1,0 +1,56 @@
+# Ichiban apps — Apple TV board + iPad screens
+
+Two native apps for the five Apple devices in the restaurant. Both are internal
+builds signed with your own developer account; neither goes near the App Store.
+
+| Target | Device | What it is |
+|---|---|---|
+| `IchibanBoard` | Apple TV | **Native.** tvOS has no WebKit at all — no Safari, no `WKWebView` — so the guest board is written in SwiftUI against the public `/api/display/<id>` feed. |
+| `IchibanScreens` | 4 × iPad | **Native shell around the web pages.** iOS does have WebKit, so each screen is the page the server already renders. A menu change or bug fix reaches every iPad on the next load — no rebuild, no re-signing, no review. |
+
+## Build
+
+```bash
+cd apps
+xcodegen generate          # writes Ichiban.xcodeproj from project.yml
+open Ichiban.xcodeproj
+```
+
+Set your Team under Signing & Capabilities for each target, then Run.
+
+The tvOS target needs the tvOS platform installed:
+
+```bash
+xcodebuild -downloadPlatform tvOS      # ~5 GB, one time
+```
+
+## Setting up a device
+
+Neither app is hardcoded to a server. On first launch each one asks for the
+server address and restaurant ID, and stores them on the device. Moving the
+server to the VPS, or replacing a dead Mac mini, is a settings change on five
+devices — never a rebuild and re-sign of five apps.
+
+- **iPad:** first launch shows a picker — Kiosk, Sushi bar, Hot line, Reception,
+  or Pay. Choose once. Three fingers held on the screen for 1.5 s returns to it.
+- **Apple TV:** the board starts immediately. Press **Play/Pause** on the remote
+  to open setup.
+
+## Signing, and the date you must not forget
+
+Development builds signed with a paid developer account stop launching after
+**one year**. Put a calendar reminder on it — otherwise the board and the kitchen
+screens fail on a random Tuesday, mid-service.
+
+The iPads have a fallback if that happens: open the same URLs in Safari and use
+"Add to Home Screen". The Apple TV has none — which is why the Raspberry Pi
+option in `DEPLOY.md` §7b is still worth keeping as a spare.
+
+## Why the iPads are a web shell and not native SwiftUI
+
+Four screens that all show live server state, on the same wifi as the server.
+Rewriting them natively would buy push notifications and offline caching, and
+cost a rebuild-and-reinstall cycle on four devices for every menu tweak. The
+shell adds the two things Safari doesn't: the screen never sleeps, and it
+reloads on wake, so an iPad that slept through a server restart comes back
+showing live orders instead of an error page nobody notices.
