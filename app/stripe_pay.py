@@ -6,6 +6,9 @@ import os
 import stripe
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+# Comma-separated, because one endpoint is rarely the whole story: a test-mode
+# and a live-mode destination have different secrets, and rotating a secret means
+# briefly accepting the old one and the new one. Any of them may verify an event.
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8100")
 # Explicit opt-in for the no-Stripe testing stub. Without this AND without a
@@ -18,6 +21,12 @@ if STRIPE_SECRET_KEY:
 
 def stripe_enabled() -> bool:
     return bool(STRIPE_SECRET_KEY)
+
+
+def webhook_secrets() -> list[str]:
+    """Every signing secret we'll accept, in order. Read at call time so tests
+    and a restart-free key change both take effect."""
+    return [s.strip() for s in STRIPE_WEBHOOK_SECRET.split(",") if s.strip()]
 
 
 def payments_configured() -> bool:
@@ -60,11 +69,18 @@ def parse_webhook(payload: bytes, sig_header: str):
     """
     import json
 
-    if STRIPE_WEBHOOK_SECRET:
+    secrets_ = webhook_secrets()
+    if secrets_:
         # Verify with the SDK, then read the raw payload ourselves. construct_event
         # hands back a StripeObject, which is not a dict — .get() on it raises
         # AttributeError, which would 400 every genuine payment.
-        stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        for i, secret in enumerate(secrets_):
+            try:
+                stripe.Webhook.construct_event(payload, sig_header, secret)
+                break
+            except stripe.SignatureVerificationError:
+                if i == len(secrets_) - 1:
+                    raise  # none of the configured endpoints signed this
     elif not (DEMO_PAYMENTS and not STRIPE_SECRET_KEY):
         raise RuntimeError(
             "STRIPE_WEBHOOK_SECRET is not set — refusing to trust an unsigned webhook")

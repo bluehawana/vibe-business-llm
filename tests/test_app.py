@@ -690,3 +690,44 @@ def test_unsigned_webhook_refused_when_stripe_is_live(project_id, monkeypatch):
     r = guest.post("/api/stripe/webhook", content=json.dumps(forged))
     assert r.status_code == 400
     assert db.get_order(order_id)["status"] == "pending"  # still not paid
+
+
+def _webhook_for(order_id):
+    return json.dumps({"object": "event", "type": "checkout.session.completed",
+                       "data": {"object": {"metadata": {"order_id": order_id}}}})
+
+
+@pytest.mark.parametrize("signer", ["whsec_one", "whsec_two"])
+def test_either_configured_signing_secret_verifies(project_id, monkeypatch, signer):
+    """Two endpoints (test + live, or a rotation in progress) each sign with
+    their own secret. Both must be accepted, or half the payments go missing."""
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "whsec_one, whsec_two")
+    order_id = db.create_order(project_id, [{"id": "m", "name": "M", "price": 1, "qty": 1}],
+                               {"name": "A", "mode": "pickup"}, 1, "SEK", "pending")
+    payload = _webhook_for(order_id)
+    r = guest.post("/api/stripe/webhook", content=payload,
+                   headers=signed_webhook(payload, signer))
+    assert r.status_code == 200
+    assert db.get_order(order_id)["status"] == "paid"
+
+
+def test_a_secret_we_never_configured_is_rejected(project_id, monkeypatch):
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "whsec_one, whsec_two")
+    order_id = db.create_order(project_id, [{"id": "m", "name": "M", "price": 1, "qty": 1}],
+                               {"name": "A", "mode": "pickup"}, 1, "SEK", "pending")
+    payload = _webhook_for(order_id)
+    r = guest.post("/api/stripe/webhook", content=payload,
+                   headers=signed_webhook(payload, "whsec_attacker"))
+    assert r.status_code == 400
+    assert db.get_order(order_id)["status"] == "pending"
+
+
+def test_thin_payload_endpoint_is_a_harmless_no_op(project_id, monkeypatch):
+    """If a second destination is left on 'thin', its events carry no metadata.
+    They must be ignored quietly, not crash the endpoint."""
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "whsec_one")
+    payload = json.dumps({"object": "event", "type": "checkout.session.completed",
+                          "data": {"object": {"id": "cs_live_x"}}})
+    r = guest.post("/api/stripe/webhook", content=payload,
+                   headers=signed_webhook(payload, "whsec_one"))
+    assert r.status_code == 200

@@ -122,10 +122,25 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 BASE_URL=https://order.ichiban.biz
 ```
 
-Then in the Stripe Dashboard add a webhook endpoint
-`https://order.ichiban.biz/api/stripe/webhook` for `checkout.session.completed`,
-and enable Swish / Apple Pay / Klarna under Payment methods — those are dashboard
-toggles, no code. Test with `4242 4242 4242 4242` before switching to `sk_live_`.
+Then in the Stripe Dashboard add a webhook endpoint. Three settings matter and
+the rest is cosmetic:
+
+| Field | Value | Why |
+|---|---|---|
+| Endpoint URL | `https://order.ichiban.biz/api/stripe/webhook` | must be public HTTPS — do the tunnel first |
+| Events | **only `checkout.session.completed`** | the one event we act on; 233 events is noise |
+| Payload style | **Snapshot** | a thin payload omits the object, so the order id never arrives |
+
+**More than one signing secret?** Test mode and live mode have different ones,
+and rotating a secret means accepting the old and new one for a while. Comma-separate
+them — an event is accepted if any of them signed it:
+
+```
+STRIPE_WEBHOOK_SECRET=whsec_test_one,whsec_live_two
+```
+
+Enable Swish / Apple Pay / Klarna under Payment methods — dashboard toggles, no
+code. Test with `4242 4242 4242 4242` before switching to `sk_live_`.
 
 ## 6. Public URL (Cloudflare Tunnel, free)
 
