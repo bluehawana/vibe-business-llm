@@ -747,3 +747,32 @@ def test_root_falls_back_to_the_platform_page(project_id, monkeypatch):
     # a stale id must not take the whole site down with a redirect loop
     monkeypatch.setattr(main, "HOME_PROJECT", "deleted-project")
     assert guest.get("/", follow_redirects=False).status_code == 200
+
+
+def test_tv_board_works_without_a_login(project_id):
+    """A signage box has no keyboard. The board must load its own data."""
+    _enable_dine_in(project_id)
+    oid = order_id_of(checkout(project_id, mode="dine_in", table="3", payment="in_store",
+                               kiosk=True, customer_name="Anna",
+                               customer_phone="0700000009"))
+    client.post(f"/api/kitchen/{project_id}/orders/{oid}/status", json={"state": "ready"})
+
+    r = guest.get(f"/api/display/{project_id}")
+    assert r.status_code == 200
+    orders = r.json()["orders"]
+    assert str(db.get_order(oid)["order_no"]) == str(orders[0]["order_no"])
+    assert orders[0]["fulfillment"] == "ready"
+
+
+def test_tv_board_leaks_no_customer_data(project_id):
+    """It hangs on a wall in front of strangers — numbers only, never names."""
+    _enable_dine_in(project_id)
+    checkout(project_id, mode="dine_in", table="3", payment="in_store", kiosk=True,
+             customer_name="Anna", customer_phone="0700000009")
+    body = guest.get(f"/api/display/{project_id}").text
+    for leaked in ("Anna", "0700000009", "table", "Margherita", "customer", "total"):
+        assert leaked not in body, f"{leaked!r} must not reach the public board"
+
+
+def test_staff_order_feed_still_needs_a_login(project_id):
+    assert guest.get(f"/api/kitchen/{project_id}/orders").status_code == 401

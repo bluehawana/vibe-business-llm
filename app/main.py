@@ -360,6 +360,18 @@ def kitchen_orders(project_id: str, station: str = ""):
     return {"orders": routed}
 
 
+@app.get("/api/display/{project_id}")
+def display_board(project_id: str):
+    """Public feed for the guest board — deliberately only what a room full of
+    strangers may see: a number and whether it's cooking or ready. The staff feed
+    carries names, phone numbers and addresses, which is why it needs a login and
+    why the board must not simply reuse it."""
+    _project_or_404(project_id)
+    return {"orders": [{"order_no": o["order_no"] or o["id"][:4].upper(),
+                        "fulfillment": o["fulfillment"]}
+                       for o in db.get_active_orders(project_id)]}
+
+
 @app.get("/display/{project_id}", response_class=HTMLResponse)
 def display(request: Request, project_id: str):
     """Customer-facing order-status board for a TV (open in Safari on Apple TV):

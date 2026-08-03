@@ -51,27 +51,27 @@ const PID = "{{ project.id }}";
 const FRESH_MS = 45000;
 const readySince = new Map();
 
-const label = o => o.order_no ?? o.id.slice(0, 4).toUpperCase();
+const label = o => o.order_no;
 
 async function refresh() {
   let orders;
   try {
-    orders = (await (await fetch(`/api/kitchen/${PID}/orders`)).json()).orders;
+    orders = (await (await fetch(`/api/display/${PID}`)).json()).orders;
   } catch { return; }  // a TV left on overnight must survive the server restarting
   const prep = orders.filter(o => o.fulfillment === "new" || o.fulfillment === "preparing");
   const ready = orders.filter(o => o.fulfillment === "ready");
 
   const now = Date.now();
-  const live = new Set(ready.map(o => o.id));
+  const live = new Set(ready.map(label));
   for (const id of readySince.keys()) if (!live.has(id)) readySince.delete(id);
-  for (const o of ready) if (!readySince.has(o.id)) readySince.set(o.id, now);
+  for (const o of ready) if (!readySince.has(label(o))) readySince.set(label(o), now);
 
   document.getElementById("prep").innerHTML = prep.length
     ? prep.map(o => `<span class="num">${label(o)}</span>`).join("")
     : '<p class="empty">—</p>';
   document.getElementById("ready").innerHTML = ready.length
     ? ready.map(o => {
-        const fresh = now - readySince.get(o.id) < FRESH_MS ? " fresh" : "";
+        const fresh = now - readySince.get(label(o)) < FRESH_MS ? " fresh" : "";
         return `<span class="num${fresh}">${label(o)}</span>`;
       }).join("")
     : '<p class="empty">—</p>';
