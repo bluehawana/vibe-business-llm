@@ -83,8 +83,8 @@ orders stop during an outage. That's the cheaper failure.
 # never sleep, come back after a power cut
 sudo pmset -a sleep 0 disksleep 0 displaysleep 0 autorestart 1 womp 1
 
-git clone https://github.com/bluehawana/vibe-business-llm.git ~/vibe-business-llm
-cd ~/vibe-business-llm
+git clone https://github.com/bluehawana/vibe-business-llm.git ~/Projects/vibe-business-llm
+cd ~/Projects/vibe-business-llm
 cp .env.example .env      # then edit — see §5
 ./run.sh                  # installs deps, binds 0.0.0.0:8100, prints the LAN URL
 ```
@@ -96,8 +96,8 @@ Run it as a service so it survives reboots — `~/Library/LaunchAgents/se.ichiba
 <plist version="1.0"><dict>
   <key>Label</key><string>se.ichiban.vibe</string>
   <key>ProgramArguments</key>
-  <array><string>/Users/USER/vibe-business-llm/run.sh</string></array>
-  <key>WorkingDirectory</key><string>/Users/USER/vibe-business-llm</string>
+  <array><string>/Users/USER/Projects/vibe-business-llm/run.sh</string></array>
+  <key>WorkingDirectory</key><string>/Users/USER/Projects/vibe-business-llm</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardErrorPath</key><string>/tmp/vibe.err.log</string>
@@ -113,7 +113,7 @@ launchctl load -w ~/Library/LaunchAgents/se.ichiban.vibe.plist
 Never paste a secret key into a chat. On the mini:
 
 ```bash
-cd ~/vibe-business-llm && open -e .env
+cd ~/Projects/vibe-business-llm && open -e .env
 ```
 
 ```
@@ -219,7 +219,7 @@ The whole business is one SQLite file, `data/vibe.db`.
 
 ```bash
 # hourly local snapshot
-sqlite3 data/vibe.db ".backup /Users/USER/backups/vibe-$(date +%H).db"
+sqlite3 data/vibe.db ".backup $HOME/backups/vibe-$(date +%H).db"
 # nightly off-site
 rsync -az ~/backups/ vps1:/srv/ichiban-backups/
 ```
