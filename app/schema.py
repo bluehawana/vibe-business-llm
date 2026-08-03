@@ -32,11 +32,31 @@ SITE_SCHEMA = _obj({
         "headline": {"type": "string"},
         "subheadline": {"type": "string"},
         "emoji": {"type": "string", "description": "1-3 emoji that fit the cuisine"},
+        "image": {"type": "string",
+                  "description": "Full-width photo URL behind the headline, or empty string"},
     }),
+    # What a search result and a shared link look like. A restaurant lives or dies
+    # on being found and on the link looking appetising when someone pastes it
+    # into a group chat — that is most of what a site builder is actually for.
+    "seo": _obj({
+        "title": {"type": "string", "description": "Browser tab and Google result title, ~60 chars"},
+        "description": {"type": "string",
+                        "description": "Google result and link-preview text, ~155 chars"},
+    }),
+    "gallery": {
+        "type": "array",
+        "description": "Photos of the food and the room. Empty list if none.",
+        "items": _obj({
+            "image": {"type": "string", "description": "Photo URL"},
+            "caption": {"type": "string"},
+        }),
+    },
     "menu": {
         "type": "array",
         "items": _obj({
             "category": {"type": "string"},
+            "image": {"type": "string",
+                      "description": "Photo URL for the category tile, or empty string"},
             "items": {
                 "type": "array",
                 "items": _obj({
@@ -48,6 +68,8 @@ SITE_SCHEMA = _obj({
                                 "description": "which station prepares this — routes it to the right kitchen screen/printer. sushi/sashimi/maki/nigiri -> sushi; hot dishes -> kitchen; drinks -> bar; desserts -> dessert."},
                     "tags": {"type": "array", "items": {"type": "string"},
                              "description": "e.g. vegetarian, vegan, spicy, popular, gluten-free"},
+                    "image": {"type": "string",
+                              "description": "Photo URL for this dish, or empty string if there is none"},
                 }),
             },
         }),
@@ -104,7 +126,9 @@ DEFAULT_SPEC = {
         "text_color": "#2b2a26",
         "font": "mixed",
     },
-    "hero": {"headline": "Welcome", "subheadline": "", "emoji": "🍽️"},
+    "hero": {"headline": "Welcome", "subheadline": "", "emoji": "🍽️", "image": ""},
+    "seo": {"title": "", "description": ""},
+    "gallery": [],
     "menu": [],
     "services": {"pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
                  "dine_in": False, "pay_online": True, "pay_in_store": True},
