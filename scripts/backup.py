@@ -50,11 +50,30 @@ print(f"{stamp}  ok  {projects} projects, {orders} orders")
 # because of a credential problem.
 def upload_to_r2(path: Path) -> str:
     import os
-    account = os.environ.get("R2_ACCOUNT_ID", "")
-    key_id = os.environ.get("R2_ACCESS_KEY_ID", "")
-    secret = os.environ.get("R2_SECRET_ACCESS_KEY", "")
-    bucket = os.environ.get("R2_BUCKET", "")
-    if not all([account, key_id, secret, bucket]):
+    from urllib.parse import urlparse
+
+    def env(*names):
+        for n in names:
+            v = os.environ.get(n, "").strip()
+            if v:
+                return v
+        return ""
+
+    # Accept both naming schemes: the CLOUDFLARE_R2_* names Harvad uses in .env
+    # and the shorter R2_* ones this script originally shipped with.
+    key_id = env("CLOUDFLARE_R2_ACCESS_ID", "CLOUDFLARE_R2_ACCESS_KEY_ID", "R2_ACCESS_KEY_ID")
+    secret = env("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "R2_SECRET_ACCESS_KEY")
+    bucket = env("CLOUDFLARE_R2_BUCKET", "R2_BUCKET")
+    account = env("CLOUDFLARE_R2_ACCOUNT_ID", "R2_ACCOUNT_ID")
+    # An explicit endpoint wins; people paste it with the bucket path attached,
+    # so keep only scheme+host — boto3 wants the bucket separately.
+    endpoint = env("CLOUDFLARE_S3_CLIENT_ENDPOINT", "R2_ENDPOINT")
+    if endpoint:
+        u = urlparse(endpoint if "://" in endpoint else "https://" + endpoint)
+        endpoint = f"{u.scheme}://{u.netloc}"
+    elif account:
+        endpoint = f"https://{account}.r2.cloudflarestorage.com"
+    if not all([endpoint, key_id, secret, bucket]):
         return "r2 not configured"
     try:
         import boto3
@@ -63,7 +82,7 @@ def upload_to_r2(path: Path) -> str:
     try:
         s3 = boto3.client(
             "s3",
-            endpoint_url=f"https://{account}.r2.cloudflarestorage.com",
+            endpoint_url=endpoint,
             aws_access_key_id=key_id,
             aws_secret_access_key=secret,
             region_name="auto",
