@@ -35,7 +35,8 @@ SPEC.update({
         {"id": "carbonara", "name": "Carbonara", "description": "Pasta", "price": 149, "tags": []},
     ]}],
     "services": {"pickup": True, "delivery": True, "delivery_fee": 45,
-                 "min_order_for_delivery": 200},
+                 "min_order_for_delivery": 200, "dine_in": False,
+                 "pay_online": True, "pay_in_store": True},
 })
 
 
@@ -54,6 +55,12 @@ def checkout(pid, **overrides):
     return client.post(f"/api/site/{pid}/checkout", json=body)
 
 
+def order_id_of(response):
+    """Both lanes redirect with ?order=<id>; real Stripe redirects to its own URL."""
+    url = response.json()["url"]
+    return url.split("order=")[1].split("&")[0] if "order=" in url else url.rsplit("/", 1)[1]
+
+
 # ---------- schema ----------
 
 def test_find_menu_item():
@@ -67,7 +74,8 @@ def test_site_renders_from_spec(project_id):
     html = client.get(f"/site/{project_id}").text
     assert "Testkrogen" in html
     assert "Margherita" in html and "119" in html
-    assert "Avhämtning" in html  # Swedish because spec.language == sv
+    assert "Ta med" in html  # Swedish because spec.language == sv
+    assert "Hur vill du ha din mat?" in html  # eat-here/take-away asked up front
 
 
 def test_unknown_project_404():
@@ -330,31 +338,53 @@ def test_crm_aggregates_by_phone(project_id):
 
 def test_cloudprnt_poll_serve_confirm(project_id):
     _enable_dine_in(project_id)
-    r = checkout(project_id, mode="dine_in", table="12")
-    order_id = r.json()["url"].split("order=")[1].split("&")[0]
+    r = checkout(project_id, mode="dine_in", table="12", payment="in_store")
+    order_id = order_id_of(r)
 
     # printer polls -> job ready
     poll = client.post(f"/api/cloudprnt/{project_id}").json()
     assert poll["jobReady"] is True
     assert poll["jobToken"] == order_id
 
-    # printer fetches the ticket -> plain text with table + items
+    # printer fetches the job -> plain text with table + items
     job = client.get(f"/api/cloudprnt/{project_id}")
     assert job.status_code == 200
     assert "Bord:" in job.text and "12" in job.text
     assert "Margherita" in job.text
-    assert "BETALA I RESTAURANGEN" in job.text  # dine-in settles on Zettle
+    assert "EJ BETALD" in job.text  # settles on the Zettle reader
+
+    # a kitchen-only printer gets the ticket without the guest's slip
+    kitchen_only = client.get(f"/api/cloudprnt/{project_id}?role=kitchen").text
+    assert "KÖK" in kitchen_only and "BESTÄLLNING" not in kitchen_only
+    # eat-here food goes on a plate, so no bag label is printed for it
+    assert "TA MED / TAKE AWAY" not in kitchen_only
 
     # printer confirms -> job no longer offered
     assert client.delete(f"/api/cloudprnt/{project_id}?token={order_id}").status_code == 200
     assert client.post(f"/api/cloudprnt/{project_id}").json()["jobReady"] is False
 
 
+def test_takeaway_prints_a_bag_label_with_number_and_name(project_id):
+    """Reception hands bags over off the label alone — it must carry both."""
+    r = checkout(project_id, mode="pickup", payment="in_store", kiosk=True,
+                 customer_name="Yan")
+    no = str(db.get_order(order_id_of(r))["order_no"])
+    job = client.get(f"/api/cloudprnt/{project_id}").text
+    assert "TA MED / TAKE AWAY" in job
+    label = job.split("TA MED / TAKE AWAY")[1]
+    assert no in label and "YAN" in label
+
+
+def test_reception_screen_splits_tables_from_bags(project_id):
+    html = client.get(f"/pass/{project_id}").text
+    assert "Bär ut till bordet" in html and "Packa i påse" in html
+
+
 def test_receipt_page_renders(project_id):
     r = checkout(project_id)
     order_id = r.json()["url"].split("order=")[1].split("&")[0]
     html = client.get(f"/receipt/{order_id}").text
-    assert "Kundkvitto" in html and "Köksbong" in html and "SUMMA" in html
+    assert "Gästens nummerlapp" in html and "Köksbong" in html and "SUMMA" in html
 
 
 # ---------- in-store iPad kiosk ----------
@@ -410,41 +440,128 @@ def test_station_with_no_items_hides_order(project_id):
 
 
 def test_tv_display_renders(project_id):
-    assert "Klar för avhämtning" in client.get(f"/display/{project_id}").text
+    assert "Klar — hämta din mat" in client.get(f"/display/{project_id}").text
 
 
-# ---------- two payment lanes: dine-in (Zettle in-store) vs takeaway (Stripe) ----------
+# ---------- one flow, two payment lanes, for eat-here AND take-away ----------
 
-def test_dine_in_pays_in_store_and_reaches_kitchen(project_id):
+@pytest.mark.parametrize("mode,table", [("dine_in", "6"), ("pickup", "")])
+def test_either_mode_can_pay_online(project_id, mode, table):
+    """The point of the unified flow: eat-here and take-away both reach Stripe."""
     _enable_dine_in(project_id)
-    r = checkout(project_id, mode="dine_in", table="6", payment="in_store")
+    r = checkout(project_id, mode=mode, table=table, payment="online")
+    assert r.status_code == 200
+    order = db.get_order(order_id_of(r))
+    assert order["status"] == "paid"  # demo stub completes instantly
+    assert order["customer"]["payment"] == "online"
+
+
+@pytest.mark.parametrize("mode,table", [("dine_in", "6"), ("pickup", "")])
+def test_either_mode_can_pay_on_the_zettle_reader(project_id, mode, table):
+    _enable_dine_in(project_id)
+    r = checkout(project_id, mode=mode, table=table, payment="in_store")
     assert r.status_code == 200
     assert "instore=1" in r.json()["url"]
-    order_id = r.json()["url"].split("order=")[1].split("&")[0]
+    order_id = order_id_of(r)
+    assert db.get_order(order_id)["status"] == "unpaid"
 
-    # in-store dine-in order: unpaid but on the kitchen board immediately (guest seated)
-    order = db.get_order(order_id)
-    assert order["status"] == "in_store"
-    assert order["customer"]["payment"] == "in_store"
+    # it queues on the counter screen with the amount to key into the reader
+    unsettled = client.get(f"/api/counter/{project_id}/unsettled").json()["orders"]
+    assert any(o["id"] == order_id for o in unsettled)
+
+    # staff charges it on Zettle and taps "Betald" -> paid, and recorded as such
+    assert client.post(f"/api/admin/{project_id}/orders/{order_id}/settle").status_code == 200
+    settled = db.get_order(order_id)
+    assert settled["status"] == "paid"
+    assert settled["paid_via"] == "zettle"
+    assert client.get(f"/api/counter/{project_id}/unsettled").json()["orders"] == []
+
+
+def test_delivery_cannot_be_paid_in_store(project_id):
+    """Nobody to hand a card reader to at a doorstep."""
+    r = checkout(project_id, mode="delivery", address="Gata 1", payment="in_store",
+                 items=[{"id": "carbonara", "qty": 2}])
+    assert r.status_code == 400
+
+
+def test_owner_can_switch_off_a_payment_lane(project_id):
+    project = db.get_project(project_id)
+    project["spec"]["services"]["pay_in_store"] = False
+    db.update_spec(project_id, project["spec"])
+    assert checkout(project_id, payment="in_store").status_code == 400
+    assert checkout(project_id, payment="online").status_code == 200
+
+
+def test_unknown_payment_method_rejected(project_id):
+    assert checkout(project_id, payment="bitcoin").status_code == 400
+
+
+# ---------- who gets cooked before the money lands ----------
+
+def test_guest_in_the_restaurant_is_cooked_before_paying(project_id):
+    """Standing at the counter iPad: the kitchen starts, they pay on the reader."""
+    r = checkout(project_id, mode="pickup", payment="in_store", kiosk=True)
+    order_id = order_id_of(r)
     board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
     assert any(o["id"] == order_id for o in board)
 
-    # it shows in the "settle on Zettle" list; staff settles it -> becomes paid
-    assert order_id in client.get(f"/admin/{project_id}/orders").text
-    assert client.post(f"/api/admin/{project_id}/orders/{order_id}/settle").status_code == 200
-    assert db.get_order(order_id)["status"] == "paid"
 
-
-def test_dine_in_cannot_pay_online(project_id):
-    _enable_dine_in(project_id)
-    # compliance: in-store dine-in can't be a Stripe self-pay sale
-    r = checkout(project_id, mode="dine_in", table="6", payment="online")
-    assert r.status_code == 400
-
-
-def test_takeaway_must_prepay_online(project_id):
-    # takeaway can't be settled in-store — prepay protects against no-shows
+def test_remote_pay_on_arrival_order_waits_for_payment(project_id):
+    """Ordered from a phone, paying on arrival: a stranger who might turn up.
+    Placed, queued for the reader, but the kitchen must not see it yet."""
     r = checkout(project_id, mode="pickup", payment="in_store")
-    assert r.status_code == 400
-    # default (no payment given) routes takeaway to online and succeeds
-    assert checkout(project_id, mode="pickup").status_code == 200
+    order_id = order_id_of(r)
+    board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
+    assert all(o["id"] != order_id for o in board)
+    assert client.post(f"/api/cloudprnt/{project_id}").json()["jobReady"] is False
+
+    # once it's charged on the reader, the kitchen picks it up
+    client.post(f"/api/admin/{project_id}/orders/{order_id}/settle")
+    board2 = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
+    assert any(o["id"] == order_id for o in board2)
+
+
+# ---------- order numbers (paper + TV) ----------
+
+def test_order_numbers_are_sequential_per_restaurant(project_id):
+    other = db.create_project("Grannen", json.loads(json.dumps(SPEC)))
+    a = db.get_order(order_id_of(checkout(project_id)))
+    b = db.get_order(order_id_of(checkout(project_id)))
+    c = db.get_order(order_id_of(checkout(other)))
+
+    assert a["order_no"] == db.FIRST_ORDER_NO
+    assert b["order_no"] == db.FIRST_ORDER_NO + 1
+    # a neighbouring restaurant has its own series, not a shared counter
+    assert c["order_no"] == db.FIRST_ORDER_NO
+
+
+def test_order_number_reaches_paper_screen_and_tv(project_id):
+    _enable_dine_in(project_id)
+    order_id = order_id_of(checkout(project_id, mode="dine_in", table="4",
+                                    payment="in_store", kiosk=True))
+    no = str(db.get_order(order_id)["order_no"])
+
+    # the success screen the guest sees at the kiosk
+    assert no in client.get(f"/site/{project_id}/success?order={order_id}&instore=1").text
+    # the printable slip
+    assert no in client.get(f"/receipt/{order_id}").text
+    # the thermal printer job: guest slip AND kitchen ticket, both numbered
+    job = client.get(f"/api/cloudprnt/{project_id}").text
+    assert job.count(no) >= 2
+    assert "BESTÄLLNING" in job and "KÖK" in job
+    # the TV reads the number straight off the kitchen feed
+    board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
+    assert str(next(o["order_no"] for o in board if o["id"] == order_id)) == no
+
+
+def test_in_store_slip_is_not_presented_as_a_vat_receipt(project_id):
+    """Zettle is the certified register; our slip for those sales is an order
+    ticket. It must not print a VAT breakdown as if it were the real receipt."""
+    order_id = order_id_of(checkout(project_id, payment="in_store", kiosk=True))
+    slip = client.get(f"/receipt/{order_id}").text
+    assert "BESTÄLLNING" in slip and "BETALA I KORTTERMINALEN" in slip
+    assert "moms" not in slip
+
+    # a prepaid online order is a distance sale we account for ourselves
+    paid_id = order_id_of(checkout(project_id, payment="online"))
+    assert "moms" in client.get(f"/receipt/{paid_id}").text

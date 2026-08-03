@@ -71,14 +71,80 @@
   .paybtn:disabled { opacity: .6; }
   .cerr { color: #b3402a; font-size: .85rem; margin-top: 8px; }
   .empty { opacity: .6; padding: 20px 0; }
+  /* Choice tiles — one tap, thumb-sized, readable on a counter iPad */
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  .choices.one { grid-template-columns: 1fr; }
+  .choice { border: 2px solid #ddd; background: #fff; border-radius: 10px; padding: 12px 10px;
+      cursor: pointer; text-align: center; font-size: .9rem; color: inherit; font-family: inherit;
+      display: flex; flex-direction: column; gap: 2px; align-items: center; }
+  .choice .ic { font-size: 1.4rem; }
+  .choice .hint { font-size: .72rem; opacity: .6; }
+  .choice[aria-pressed="true"] { border-color: var(--primary); background: #fff;
+      box-shadow: inset 0 0 0 1px var(--primary); }
+  .choice[aria-pressed="true"] .lab { font-weight: 700; color: var(--primary); }
+  .kiosk .drawer { font-size: 1.05rem; }
+  .kiosk .choice { padding: 18px 10px; }
+  /* Step 1 — asked before the menu, the way a host asks at the door, so every
+     price, time and payment option below is already the right one. */
+  .gate { position: fixed; inset: 0; background: var(--bg); z-index: 80; display: none;
+      flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 26px; }
+  .gate.show { display: flex; }
+  .gate h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); text-align: center; }
+  .gate .opts { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; width: 100%;
+      max-width: 760px; }
+  .gate .opt { flex: 1 1 200px; min-height: 210px; border: 2px solid rgba(0,0,0,.1); background: #fff;
+      border-radius: 18px; cursor: pointer; font-family: inherit; color: inherit; padding: 24px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  .gate .opt:hover, .gate .opt:focus-visible { border-color: var(--primary); }
+  .gate .opt .ic { font-size: 3.4rem; }
+  .gate .opt .lab { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+  .gate .opt .hint { font-size: .85rem; opacity: .6; text-align: center; }
+  /* The choice stays visible for the whole session, like Sushi Yama's header. */
+  .modechip { background: none; border: 1px solid rgba(0,0,0,.15); border-radius: 999px;
+      padding: 5px 14px; font-size: .85rem; cursor: pointer; font-family: inherit; color: inherit; }
+  .modechip b { color: var(--primary); }
+  .cancelbtn { background: none; border: 0; color: var(--text); opacity: .5; cursor: pointer;
+      font-family: inherit; font-size: .85rem; }
+  /* Category folders */
+  .folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;
+      margin-top: 18px; }
+  .folder { position: relative; aspect-ratio: 4 / 3; border: 0; border-radius: 14px; cursor: pointer;
+      font-family: inherit; overflow: hidden; padding: 18px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 4px; text-align: center;
+      background: var(--primary) center/cover no-repeat; color: #fff; }
+  /* Scrim so the title stays legible once a real photo sits behind it. */
+  .folder::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.34); }
+  .folder > * { position: relative; z-index: 1; }
+  .folder .ftitle { font-size: 1.45rem; font-weight: 800; line-height: 1.15;
+      text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .folder .fcount { font-size: .8rem; opacity: .85; }
+  .backbtn { background: none; border: 0; color: var(--primary); font-family: inherit;
+      font-size: .95rem; cursor: pointer; padding: 12px 0; }
 </style>
 </head>
-<body>
-{% if kiosk %}<div class="announce" style="background:#2f4436">🏪 Beställ här — betala och hämta vid disken</div>{% endif %}
+<body class="{% if kiosk %}kiosk{% endif %}">
+{% if kiosk %}<div class="announce" style="background:#2f4436">🏪 {% if spec.language == 'sv' %}Beställ här — äta här eller ta med{% else %}Order here — eat in or take away{% endif %}</div>{% endif %}
 {% for a in spec.announcements %}<div class="announce">{{ a }}</div>{% endfor %}
+<div class="gate" id="gate">
+  <div class="emoji" style="font-size:2.6rem">{{ spec.hero.emoji }}</div>
+  <h1>{% if spec.language == 'sv' %}Hur vill du ha din mat?{% else %}How would you like your food?{% endif %}</h1>
+  <div class="opts">
+    {% if spec.services.dine_in %}<button type="button" class="opt" data-v="dine_in">
+      <span class="ic">🍽️</span><span class="lab">{% if spec.language == 'sv' %}Äta här{% else %}Eat in{% endif %}</span>
+      <span class="hint">{% if spec.language == 'sv' %}Vi ropar ditt nummer{% else %}We'll call your number{% endif %}</span></button>{% endif %}
+    {% if spec.services.pickup %}<button type="button" class="opt" data-v="pickup">
+      <span class="ic">🥡</span><span class="lab">{% if spec.language == 'sv' %}Ta med{% else %}Take away{% endif %}</span>
+      <span class="hint">{% if spec.language == 'sv' %}Packas för avhämtning{% else %}Packed to go{% endif %}</span></button>{% endif %}
+    {% if spec.services.delivery %}<button type="button" class="opt" data-v="delivery">
+      <span class="ic">🛵</span><span class="lab">{% if spec.language == 'sv' %}Hemleverans{% else %}Delivery{% endif %}</span>
+      <span class="hint">{% if spec.services.delivery_fee %}+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}{% endif %}</span></button>{% endif %}
+  </div>
+</div>
+
 <div class="wrap">
   <nav>
     <span class="logo">{{ spec.business_name }}</span>
+    <button class="modechip" id="modechip" hidden></button>
     <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span></button>
   </nav>
 
@@ -87,7 +153,8 @@
     <h1>{{ spec.hero.headline }}</h1>
     <p>{{ spec.hero.subheadline }}</p>
     <div class="badges">
-      {% if spec.services.pickup %}<span class="badge">{% if spec.language == 'sv' %}Avhämtning{% else %}Pickup{% endif %}</span>{% endif %}
+      {% if spec.services.dine_in %}<span class="badge">{% if spec.language == 'sv' %}Äta här{% else %}Eat in{% endif %}</span>{% endif %}
+      {% if spec.services.pickup %}<span class="badge">{% if spec.language == 'sv' %}Ta med{% else %}Take away{% endif %}</span>{% endif %}
       {% if spec.services.delivery %}<span class="badge">{% if spec.language == 'sv' %}Hemleverans{% else %}Delivery{% endif %}</span>{% endif %}
     </div>
   </div>
@@ -100,9 +167,21 @@
   {% endif %}
 
   <section id="menu">
-    <h2>{% if spec.language == 'sv' %}Meny{% else %}Menu{% endif %}</h2>
+    <h2 id="menuhead">{% if spec.language == 'sv' %}Meny{% else %}Menu{% endif %}</h2>
+    <!-- Folders first: a wall of 60 dishes is unusable on a counter iPad, so the
+         menu opens as one tile per category and drills in on tap. -->
+    <div class="folders" id="folders">
+      {% for cat in spec.menu %}
+      <button type="button" class="folder" data-cat="{{ loop.index0 }}"
+              {% if cat.get('image') %}style="background-image:url('{{ cat.image }}')"{% endif %}>
+        <span class="ftitle">{{ cat.category }}</span>
+        <span class="fcount">{{ cat['items'] | length }} {% if spec.language == 'sv' %}rätter{% else %}items{% endif %}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <button type="button" class="backbtn" id="backbtn" hidden>← {% if spec.language == 'sv' %}Alla kategorier{% else %}All categories{% endif %}</button>
     {% for cat in spec.menu %}
-    <div class="category">
+    <div class="category" data-cat="{{ loop.index0 }}" hidden>
       <h3>{{ cat.category }}</h3>
       <div class="items">
         {% for it in cat['items'] %}
@@ -144,16 +223,17 @@
     <button class="close" id="closecart">×</button></h2>
   <div id="cartlines"><p class="empty">{% if spec.language == 'sv' %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p></div>
   <div class="total"><span>{% if spec.language == 'sv' %}Summa{% else %}Total{% endif %}</span><span id="carttotal">0 {{ spec.currency }}</span></div>
-  <label>{% if spec.language == 'sv' %}Namn{% else %}Name{% endif %}</label>
-  <input id="cname">
-  <label>{% if spec.language == 'sv' %}Telefon{% else %}Phone{% endif %}</label>
-  <input id="cphone">
-  <label>{% if spec.language == 'sv' %}Leveranssätt{% else %}How{% endif %}</label>
-  <select id="cmode">
-    {% if spec.services.dine_in %}<option value="dine_in">{% if spec.language == 'sv' %}Äta här — beställ till bordet{% else %}Dine in — order to table{% endif %}</option>{% endif %}
-    {% if spec.services.pickup %}<option value="pickup">{% if spec.language == 'sv' %}Avhämtning{% else %}Pickup{% endif %}</option>{% endif %}
-    {% if spec.services.delivery %}<option value="delivery">{% if spec.language == 'sv' %}Hemleverans{% if spec.services.delivery_fee %} (+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}){% endif %}{% else %}Delivery{% if spec.services.delivery_fee %} (+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}){% endif %}{% endif %}</option>{% endif %}
-  </select>
+  <label>{% if spec.language == 'sv' %}1. Var ska du äta?{% else %}1. Where are you eating?{% endif %}</label>
+  <div class="choices" id="cmode">
+    {% if spec.services.dine_in %}<button type="button" class="choice" data-v="dine_in">
+      <span class="ic">🍽️</span><span class="lab">{% if spec.language == 'sv' %}Äta här{% else %}Eat in{% endif %}</span></button>{% endif %}
+    {% if spec.services.pickup %}<button type="button" class="choice" data-v="pickup">
+      <span class="ic">🥡</span><span class="lab">{% if spec.language == 'sv' %}Ta med{% else %}Take away{% endif %}</span></button>{% endif %}
+    {% if spec.services.delivery %}<button type="button" class="choice" data-v="delivery">
+      <span class="ic">🛵</span><span class="lab">{% if spec.language == 'sv' %}Hemleverans{% else %}Delivery{% endif %}</span>
+      {% if spec.services.delivery_fee %}<span class="hint">+{{ '%g' % spec.services.delivery_fee }} {{ spec.currency }}</span>{% endif %}</button>{% endif %}
+  </div>
+
   <div id="addrwrap" style="display:none">
     <label>{% if spec.language == 'sv' %}Adress{% else %}Address{% endif %}</label>
     <input id="caddr">
@@ -167,10 +247,33 @@
     <input id="ctime" type="time">
     <span style="font-size:.75rem;opacity:.6">{% if spec.language == 'sv' %}Lämna tomt för snarast möjligt{% else %}Leave empty for as soon as possible{% endif %}</span>
   </div>
-  {% if payments_ready %}
-  <button class="paybtn" id="paybtn">{% if spec.language == 'sv' %}Betala & beställ →{% else %}Pay & order →{% endif %}</button>
-  <p style="font-size:.75rem;opacity:.6;margin-top:8px;text-align:center">{% if spec.language == 'sv' %}Betalning sker säkert i förväg via Stripe. Din mat börjar lagas när betalningen är klar.{% else %}Secure prepayment via Stripe. Your food is prepared once payment clears.{% endif %}</p>
-  {% else %}
+
+  <label>{% if spec.language == 'sv' %}2. Hur vill du betala?{% else %}2. How would you like to pay?{% endif %}</label>
+  <div class="choices" id="cpay">
+    {% if spec.services.get('pay_online', True) and payments_ready %}
+    <button type="button" class="choice" data-v="online">
+      <span class="ic">💳</span><span class="lab">{% if spec.language == 'sv' %}Betala nu{% else %}Pay now{% endif %}</span>
+      <span class="hint">{% if spec.language == 'sv' %}Kort · Swish · Apple Pay{% else %}Card · Swish · Apple Pay{% endif %}</span></button>
+    {% endif %}
+    {% if spec.services.get('pay_in_store', True) %}
+    <button type="button" class="choice" data-v="in_store">
+      <span class="ic">🏪</span><span class="lab">{% if spec.language == 'sv' %}Betala i restaurangen{% else %}Pay in the restaurant{% endif %}</span>
+      <span class="hint">{% if spec.language == 'sv' %}Kortterminalen{% else %}Card reader{% endif %}</span></button>
+    {% endif %}
+  </div>
+
+  <div id="namewrap">
+    <label>{% if spec.language == 'sv' %}Namn — så vi kan ropa dig{% else %}Name — so we can call you{% endif %}</label>
+    <input id="cname" autocomplete="given-name">
+  </div>
+  <div id="phonewrap">
+    <label>{% if spec.language == 'sv' %}Telefon{% else %}Phone{% endif %}</label>
+    <input id="cphone" inputmode="tel">
+  </div>
+
+  <button class="paybtn" id="paybtn">{% if spec.language == 'sv' %}Beställ →{% else %}Order →{% endif %}</button>
+  <p style="font-size:.75rem;opacity:.6;margin-top:8px;text-align:center" id="payhint"></p>
+  {% if not payments_ready %}
   <p class="cerr" style="margin-top:8px">{% if spec.language == 'sv' %}Onlinebetalning är inte aktiverad ännu.{% else %}Online payment is not enabled yet.{% endif %}</p>
   {% endif %}
   <p class="cerr" id="cerr"></p>
@@ -182,82 +285,181 @@ const ITEMS = {};
 for (const cat of SPEC.menu) for (const it of cat.items) ITEMS[it.id] = it;
 const cart = {}; // id -> qty
 
+const KIOSK = {{ 'true' if kiosk else 'false' }};
+const T = {
+  eatin: '{% if spec.language == "sv" %}Äta här{% else %}Eat in{% endif %}',
+  away: '{% if spec.language == "sv" %}Ta med{% else %}Take away{% endif %}',
+  deliv: '{% if spec.language == "sv" %}Hemleverans{% else %}Delivery{% endif %}',
+  change: '{% if spec.language == "sv" %}Ändra{% else %}Change{% endif %}',
+  payNow: '{% if spec.language == "sv" %}Betala {AMT} →{% else %}Pay {AMT} →{% endif %}',
+  payHere: '{% if spec.language == "sv" %}Beställ — betala i restaurangen{% else %}Order — pay in the restaurant{% endif %}',
+  hintNow: '{% if spec.language == "sv" %}Kort, Swish eller Apple Pay. Maten börjar lagas direkt när betalningen är klar.{% else %}Card, Swish or Apple Pay. Cooking starts the moment payment clears.{% endif %}',
+  hintHere: '{% if spec.language == "sv" %}Du får ett nummer och betalar i kortterminalen i restaurangen.{% else %}You get a number and pay on the card reader in the restaurant.{% endif %}',
+  pickMode: '{% if spec.language == "sv" %}Välj äta här eller ta med först{% else %}Choose eat in or take away first{% endif %}',
+  pickPay: '{% if spec.language == "sv" %}Välj hur du vill betala{% else %}Choose how to pay{% endif %}',
+  needTable: '{% if spec.language == "sv" %}Fyll i bordsnummer{% else %}Enter your table number{% endif %}',
+  needAddr: '{% if spec.language == "sv" %}Fyll i adress{% else %}Enter your address{% endif %}',
+};
+const MODE_LABEL = { dine_in: T.eatin, pickup: T.away, delivery: T.deliv };
+
 const drawer = document.getElementById('drawer');
 document.getElementById('cartbtn').onclick = () => drawer.classList.add('open');
 document.getElementById('closecart').onclick = () => drawer.classList.remove('open');
-function modeChanged() {
-  const v = document.getElementById('cmode').value;
+
+// ---- Step 1: eat here or take away, asked before the menu ----
+let mode = null, payment = null;
+const gate = document.getElementById('gate');
+const chip = document.getElementById('modechip');
+
+function setMode(v) {
+  mode = v;
+  gate.classList.remove('show');
+  chip.hidden = false;
+  chip.innerHTML = `<b>${MODE_LABEL[v] || v}</b> · ${T.change}`;
   document.getElementById('addrwrap').style.display = v === 'delivery' ? 'block' : 'none';
-  document.getElementById('tablewrap').style.display = v === 'dine_in' ? 'block' : 'none';
+  document.getElementById('tablewrap').style.display =
+    (v === 'dine_in' && !KIOSK) ? 'block' : 'none';
   document.getElementById('timewrap').style.display = v === 'dine_in' ? 'none' : 'block';
-  // Dine-in settles in the restaurant (Zettle); takeaway/delivery prepay online.
-  const btn = document.getElementById('paybtn');
-  if (btn) btn.textContent = v === 'dine_in'
-    ? '{% if spec.language == "sv" %}Beställ — betala i restaurangen{% else %}Order — pay in the restaurant{% endif %}'
-    : '{% if spec.language == "sv" %}Betala & beställ →{% else %}Pay & order →{% endif %}';
+  syncChoices('cmode', v);
+  // Delivery has nobody to hand a reader to — only the online lane applies.
+  for (const b of document.querySelectorAll('#cpay .choice')) {
+    const blocked = v === 'delivery' && b.dataset.v === 'in_store';
+    b.hidden = blocked;
+    if (blocked && payment === 'in_store') setPayment('online');
+  }
+  const visible = [...document.querySelectorAll('#cpay .choice')].filter(b => !b.hidden);
+  document.getElementById('cpay').classList.toggle('one', visible.length === 1);
+  // Default to paying now: it is the lane that needs nobody behind a counter,
+  // and it means the button's amount is honest from the first render.
+  if (!payment || !visible.some(b => b.dataset.v === payment)) {
+    const preferred = visible.find(b => b.dataset.v === 'online') || visible[0];
+    if (preferred) { setPayment(preferred.dataset.v); return; }
+  }
+  renderCart();
 }
-document.getElementById('cmode').onchange = modeChanged;
-modeChanged();
-// ?table=5 from a QR code on the table pre-selects dine-in and fills the table number
+
+function setPayment(v) { payment = v; syncChoices('cpay', v); renderCart(); }
+
+function syncChoices(groupId, v) {
+  for (const b of document.querySelectorAll(`#${groupId} .choice`))
+    b.setAttribute('aria-pressed', String(b.dataset.v === v));
+}
+
+for (const b of document.querySelectorAll('#gate .opt')) b.onclick = () => setMode(b.dataset.v);
+for (const b of document.querySelectorAll('#cmode .choice')) b.onclick = () => setMode(b.dataset.v);
+for (const b of document.querySelectorAll('#cpay .choice')) b.onclick = () => setPayment(b.dataset.v);
+chip.onclick = () => { drawer.classList.remove('open'); gate.classList.add('show'); };
+
+// ?table=5 from a QR code on the table: the guest is already sitting down, so
+// the question is answered — skip the gate entirely.
 const qTable = new URLSearchParams(location.search).get('table');
-if (qTable && document.querySelector('#cmode option[value="dine_in"]')) {
-  document.getElementById('cmode').value = 'dine_in';
+if (qTable && document.querySelector('#gate .opt[data-v="dine_in"]')) {
   document.getElementById('ctable').value = qTable;
-  modeChanged();
+  setMode('dine_in');
+} else {
+  gate.classList.add('show');
 }
+
+// ---- Category folders ----
+const folders = document.getElementById('folders');
+const backBtn = document.getElementById('backbtn');
+const menuHead = document.getElementById('menuhead');
+const cats = [...document.querySelectorAll('.category')];
+
+function openFolder(i) {
+  folders.hidden = true;
+  backBtn.hidden = false;
+  cats.forEach(c => { c.hidden = c.dataset.cat !== String(i); });
+  menuHead.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeFolder() {
+  folders.hidden = false;
+  backBtn.hidden = true;
+  cats.forEach(c => { c.hidden = true; });
+}
+for (const f of document.querySelectorAll('.folder')) f.onclick = () => openFolder(f.dataset.cat);
+backBtn.onclick = closeFolder;
+// A single-category menu has nothing to drill into — show it flat.
+if (cats.length === 1) { folders.hidden = true; cats[0].hidden = false; }
 
 function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); drawer.classList.add('open'); }
 function bump(id, d) { cart[id] = (cart[id] || 0) + d; if (cart[id] <= 0) delete cart[id]; renderCart(); }
+
+function cartTotal() {
+  let total = 0;
+  for (const id of Object.keys(cart)) total += ITEMS[id].price * cart[id];
+  if (mode === 'delivery') total += SPEC.services.delivery_fee || 0;
+  return total;
+}
 
 function renderCart() {
   const box = document.getElementById('cartlines');
   const ids = Object.keys(cart);
   document.getElementById('cartcount').textContent = ids.reduce((s, i) => s + cart[i], 0);
-  if (!ids.length) {
-    box.innerHTML = '<p class="empty">{% if spec.language == "sv" %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p>';
-    document.getElementById('carttotal').textContent = '0 ' + SPEC.currency;
-    return;
-  }
-  let total = 0;
-  box.innerHTML = ids.map(id => {
-    const it = ITEMS[id]; total += it.price * cart[id];
-    return `<div class="cline"><span class="n">${it.name}</span>
-      <button onclick="bump('${id}',-1)">−</button><span>${cart[id]}</span>
-      <button onclick="bump('${id}',1)">+</button>
-      <span>${(it.price * cart[id]).toFixed(0)} ${SPEC.currency}</span></div>`;
-  }).join('');
+  box.innerHTML = ids.length
+    ? ids.map(id => {
+        const it = ITEMS[id];
+        return `<div class="cline"><span class="n">${it.name}</span>
+          <button onclick="bump('${id}',-1)">−</button><span>${cart[id]}</span>
+          <button onclick="bump('${id}',1)">+</button>
+          <span>${(it.price * cart[id]).toFixed(0)} ${SPEC.currency}</span></div>`;
+      }).join('')
+    : '<p class="empty">{% if spec.language == "sv" %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p>';
+  const total = cartTotal();
   document.getElementById('carttotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
+
+  // The button says exactly what happens next, so nobody taps "Pay" expecting
+  // a card form and lands on "go to the counter" instead.
+  const btn = document.getElementById('paybtn');
+  const hint = document.getElementById('payhint');
+  if (payment === 'in_store') {
+    btn.textContent = T.payHere;
+    hint.textContent = T.hintHere;
+  } else {
+    btn.textContent = T.payNow.replace('{AMT}', total.toFixed(0) + ' ' + SPEC.currency);
+    hint.textContent = T.hintNow;
+  }
+  // At a counter iPad nobody types a phone number, but a first name is worth
+  // asking for: it goes on the bag so reception can hand it over by name.
+  document.getElementById('phonewrap').hidden = KIOSK;
 }
 
 const payBtn = document.getElementById('paybtn');
-if (payBtn) payBtn.onclick = async () => {
+payBtn.onclick = async () => {
   const err = document.getElementById('cerr');
   err.textContent = '';
-  const btn = document.getElementById('paybtn');
-  btn.disabled = true;
+  if (!Object.keys(cart).length) return;
+  if (!mode) { err.textContent = T.pickMode; gate.classList.add('show'); return; }
+  if (!payment) { err.textContent = T.pickPay; return; }
+  if (mode === 'delivery' && !document.getElementById('caddr').value.trim()) {
+    err.textContent = T.needAddr; return;
+  }
+  if (mode === 'dine_in' && !KIOSK && !document.getElementById('ctable').value.trim()) {
+    err.textContent = T.needTable; return;
+  }
+  payBtn.disabled = true;
   try {
     const res = await fetch('/api/site/{{ project_id }}/checkout', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         items: Object.keys(cart).map(id => ({ id, qty: cart[id] })),
-        customer_name: document.getElementById('cname').value,
-        customer_phone: document.getElementById('cphone').value,
-        mode: document.getElementById('cmode').value,
+        customer_name: (document.getElementById('cname') || {}).value || '',
+        customer_phone: (document.getElementById('cphone') || {}).value || '',
+        mode, payment, kiosk: KIOSK,
         address: (document.getElementById('caddr') || {}).value || '',
         table: (document.getElementById('ctable') || {}).value || '',
         pickup_time: (document.getElementById('ctime') || {}).value || '',
-        payment: document.getElementById('cmode').value === 'dine_in' ? 'in_store' : 'online'
       })
     });
     if (!res.ok) throw new Error((await res.json()).detail || 'checkout failed');
-    const data = await res.json();
-    window.location.href = data.url;
+    window.location.href = (await res.json()).url;
   } catch (e) {
     err.textContent = e.message;
-    btn.disabled = false;
+    payBtn.disabled = false;
   }
 };
+renderCart();
 </script>
 </body>
 </html>

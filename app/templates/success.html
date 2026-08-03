@@ -7,12 +7,20 @@
 <style>
   * { box-sizing: border-box; margin: 0; }
   body { background: {{ spec.theme.background_color }}; color: {{ spec.theme.text_color }};
-         font-family: Georgia, serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-  .card { background: #fff; border-radius: 14px; padding: 36px; max-width: 480px; width: 100%;
+         font-family: Georgia, serif; min-height: 100vh; display: flex; align-items: center;
+         justify-content: center; padding: 24px; }
+  .card { background: #fff; border-radius: 14px; padding: 32px 28px; max-width: 480px; width: 100%;
           box-shadow: 0 4px 20px rgba(0,0,0,.07); text-align: center; }
-  h1 { color: {{ spec.theme.primary_color }}; margin-bottom: 8px; }
-  .check { font-size: 3rem; }
+  h1 { color: {{ spec.theme.primary_color }}; margin-bottom: 8px; font-size: 1.5rem; }
   p { opacity: .8; margin: 8px 0; }
+  /* The number is the point of this page — everything else is smaller than it. */
+  .nolabel { font-family: -apple-system, sans-serif; font-size: .8rem; letter-spacing: .16em;
+             text-transform: uppercase; opacity: .5; margin-top: 6px; }
+  .no { font-size: 5.5rem; line-height: 1.05; font-weight: 800; color: {{ spec.theme.primary_color }};
+        font-variant-numeric: tabular-nums; font-family: -apple-system, sans-serif; }
+  .pay { background: #fff4d6; border: 1px solid #e8d9a0; border-radius: 10px; padding: 16px;
+         margin: 18px 0; font-family: -apple-system, sans-serif; }
+  .pay .amt { font-size: 2rem; font-weight: 800; color: #8a6414; display: block; margin-top: 4px; }
   .lines { text-align: left; margin: 20px 0; font-family: -apple-system, sans-serif; font-size: .92rem; }
   .lines div { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
   .lines .tot { font-weight: 700; border-bottom: 0; }
@@ -22,10 +30,21 @@
 </head>
 <body>
 <div class="card">
-  <div class="check">✅</div>
-  <h1>{% if spec.language == 'sv' %}Tack för din beställning!{% else %}Thank you for your order!{% endif %}</h1>
   {% if order %}
-  <p>{% if spec.language == 'sv' %}Ordernummer{% else %}Order{% endif %} #{{ order.id }}</p>
+  {% set no = order.order_no or order.id[:4] | upper %}
+  <div class="check" style="font-size:2.4rem">{% if instore %}🧾{% else %}✅{% endif %}</div>
+  <h1>{% if instore %}{% if spec.language == 'sv' %}Beställningen är registrerad{% else %}Your order is placed{% endif %}
+      {% else %}{% if spec.language == 'sv' %}Tack för din beställning!{% else %}Thank you for your order!{% endif %}{% endif %}</h1>
+  <p class="nolabel">{% if spec.language == 'sv' %}Ditt nummer{% else %}Your number{% endif %}</p>
+  <div class="no">{{ no }}</div>
+
+  {% if instore %}
+  <div class="pay">
+    {% if spec.language == 'sv' %}Betala i kortterminalen i restaurangen{% else %}Pay on the card reader in the restaurant{% endif %}
+    <span class="amt">{{ '%g' % order.total }} {{ order.currency }}</span>
+  </div>
+  {% endif %}
+
   <div class="lines">
     {% for it in order['items'] %}
     <div><span>{{ it.qty }} × {{ it.name }}</span><span>{{ '%g' % (it.price * it.qty) }} {{ order.currency }}</span></div>
@@ -33,11 +52,24 @@
     <div class="tot"><span>{% if spec.language == 'sv' %}Summa{% else %}Total{% endif %}</span>
       <span>{{ '%g' % order.total }} {{ order.currency }}</span></div>
   </div>
-  <p>{% if order.customer.mode == 'delivery' %}{% if spec.language == 'sv' %}Levereras till: {{ order.customer.address }}{% else %}Delivering to: {{ order.customer.address }}{% endif %}{% else %}{% if spec.language == 'sv' %}Hämtas hos {{ spec.business_name }}{% else %}Pickup at {{ spec.business_name }}{% endif %}{% endif %}</p>
-  {% endif %}
-  {% if instore %}<p>{% if spec.language == 'sv' %}Din beställning är skickad till köket. Betala vid bordet eller kassan.{% else %}Your order has been sent to the kitchen. Pay at your table or the counter.{% endif %}</p>{% endif %}
+
+  <p>
+    {%- if order.customer.mode == 'delivery' -%}
+      {% if spec.language == 'sv' %}Levereras till {{ order.customer.address }}{% else %}Delivering to {{ order.customer.address }}{% endif %}
+    {%- elif order.customer.mode == 'dine_in' -%}
+      {% if order.customer.table %}{% if spec.language == 'sv' %}Serveras till bord {{ order.customer.table }}{% else %}Served to table {{ order.customer.table }}{% endif %}
+      {% else %}{% if spec.language == 'sv' %}Vi ropar ditt nummer när maten är klar{% else %}We'll call your number when it's ready{% endif %}{% endif %}
+    {%- else -%}
+      {% if spec.language == 'sv' %}Håll koll på skärmen — ditt nummer visas när maten är klar{% else %}Watch the screen — your number appears when it's ready{% endif %}
+    {%- endif -%}
+  </p>
+
   {% if demo %}<p class="demo">Demo mode — no payment was processed (Stripe not configured).</p>{% endif %}
-  {% if order %}<p><a href="/receipt/{{ order.id }}" target="_blank">🖨️ {% if spec.language == 'sv' %}Skriv ut kvitto{% else %}Print receipt{% endif %}</a></p>{% endif %}
+  <p><a href="/receipt/{{ order.id }}" target="_blank">🖨️ {% if spec.language == 'sv' %}Skriv ut nummerlapp{% else %}Print your slip{% endif %}</a></p>
+  {% else %}
+  <div class="check" style="font-size:2.4rem">✅</div>
+  <h1>{% if spec.language == 'sv' %}Tack för din beställning!{% else %}Thank you for your order!{% endif %}</h1>
+  {% endif %}
   <a href="/site/{{ project_id }}">{% if spec.language == 'sv' %}← Tillbaka till {{ spec.business_name }}{% else %}← Back to {{ spec.business_name }}{% endif %}</a>
 </div>
 </body>

@@ -31,13 +31,14 @@ class CartItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     items: list[CartItem]
-    customer_name: str
-    customer_phone: str
+    customer_name: str = ""
+    customer_phone: str = ""
     mode: str  # "pickup" | "delivery" | "dine_in"
     address: str = ""
     table: str = ""  # dine_in: table number from QR code / in-store iPad
     pickup_time: str = ""  # pickup/delivery: requested time, e.g. "18:30" or "ASAP"
-    payment: str = ""  # "online" (Stripe prepaid) | "in_store" (settle at counter via Zettle)
+    payment: str = ""  # "online" (Stripe) | "in_store" (Zettle card reader)
+    kiosk: bool = False  # placed on the restaurant's own iPad, guest standing there
 
 
 class FulfillmentUpdate(BaseModel):
@@ -125,7 +126,9 @@ def checkout(project_id: str, body: CheckoutRequest):
     if body.mode == "dine_in":
         if not services.get("dine_in"):
             raise HTTPException(400, "Dine-in ordering is not offered")
-        if not body.table.strip():
+        # A table number is how a waiter finds you. At the counter iPad there is
+        # no waiter — the guest is called by order number, so no table needed.
+        if not body.kiosk and not body.table.strip():
             raise HTTPException(400, "Table number is required for dine-in orders")
 
     line_items, order_items, total = [], [], 0.0
@@ -165,43 +168,52 @@ def checkout(project_id: str, body: CheckoutRequest):
                 "pickup_time": body.pickup_time or "ASAP"}
     currency = spec.get("currency", "SEK")
 
-    # Two payment lanes, gated by Swedish kassaregister rules:
-    #  - dine_in  -> "in_store": in-store manned sale, MUST settle through the
-    #    certified register (Zettle). Cooked now, guest pays at the table/counter.
-    #  - pickup/delivery -> "online": remote prepaid distance sale (Stripe),
-    #    exempt from the register requirement; prepay protects against no-shows.
-    default_payment = "in_store" if body.mode == "dine_in" else "online"
-    payment = body.payment or default_payment
+    # The guest is standing in the restaurant: at a table (QR) or at the counter
+    # iPad. That is what decides whether the kitchen may start before the money
+    # lands — not whether it's eat-here or takeaway.
+    serve_now = body.kiosk or body.mode == "dine_in"
 
-    if body.mode == "dine_in" and payment != "in_store":
-        # Dine-in self-pay-on-own-device via Stripe would need a certified
-        # kontrollsystem we don't yet integrate — block it rather than break the law.
-        raise HTTPException(400, "Dine-in orders are paid in the restaurant")
-    if body.mode in ("pickup", "delivery") and payment != "online":
-        raise HTTPException(400, "Takeaway and delivery are prepaid online")
+    # One flow, two payment lanes — the guest picks, the same for every mode:
+    #  - "online"   -> Stripe, taken at the moment of ordering. Nobody at a till.
+    #  - "in_store" -> the Zettle card reader, which is the certified Swedish
+    #    kassaregister. Zettle stays in the loop precisely so an on-premises card
+    #    payment is registered where the law requires it.
+    payment = body.payment or "online"
+    if payment not in ("online", "in_store"):
+        raise HTTPException(400, f"Unknown payment method: {payment}")
 
+    # Delivery has nobody to hand a card reader to — it is always prepaid.
+    if body.mode == "delivery" and payment != "online":
+        raise HTTPException(400, "Delivery orders are paid online")
+    if payment == "online" and not services.get("pay_online", True):
+        raise HTTPException(400, "Online payment is not offered here")
+    if payment == "in_store" and not services.get("pay_in_store", True):
+        raise HTTPException(400, "Paying in the restaurant is not offered here")
+    # A remote order that pays on arrival is just a stranger who might turn up —
+    # let it be placed, but the kitchen won't see it until the reader confirms.
     customer["payment"] = payment
 
     if payment == "in_store":
-        # Goes straight to the kitchen (guest is seated); staff settles it on
-        # Zettle afterwards and marks it paid from the orders dashboard.
-        order_id = db.create_order(project_id, order_items, customer, total, currency, "in_store")
+        order_id = db.create_order(project_id, order_items, customer, total, currency,
+                                   "unpaid", serve_now=serve_now)
         return {"url": f"/site/{project_id}/success?order={order_id}&instore=1"}
 
-    # Online lane: prepayment is mandatory — no order reaches the kitchen until paid.
     if not stripe_pay.payments_configured():
         raise HTTPException(503, "Online payments are not set up yet for this shop")
 
     if stripe_pay.stripe_enabled():
         # Real Stripe: order stays 'pending' and is INVISIBLE to the kitchen
         # until Stripe's webhook confirms payment (see mark_order_paid).
-        order_id = db.create_order(project_id, order_items, customer, total, currency, "pending")
+        order_id = db.create_order(project_id, order_items, customer, total, currency,
+                                   "pending", serve_now=serve_now)
         url = stripe_pay.create_checkout_session(project_id, order_id, line_items, currency)
         return {"url": url}
 
     # Local demo stub (VIBE_DEMO_PAYMENTS=1 only): simulates a successful payment
     # so the full chain can be tested without real Stripe keys.
-    order_id = db.create_order(project_id, order_items, customer, total, currency, "paid")
+    order_id = db.create_order(project_id, order_items, customer, total, currency,
+                               "paid", serve_now=serve_now)
+    db.mark_order_paid(order_id, paid_via="stripe")
     return {"url": f"/site/{project_id}/success?order={order_id}&demo=1"}
 
 
@@ -227,7 +239,7 @@ async def stripe_webhook(request: Request):
     except Exception:
         return JSONResponse({"error": "invalid signature"}, status_code=400)
     if order_id:
-        db.mark_order_paid(order_id)
+        db.mark_order_paid(order_id, paid_via="stripe")
     return {"ok": True}
 
 
@@ -248,6 +260,30 @@ def _station_of(spec: dict) -> dict:
         for it in cat.get("items", []):
             out[it["id"]] = it.get("station", "kitchen")
     return out
+
+
+@app.get("/counter/{project_id}", response_class=HTMLResponse)
+def counter(request: Request, project_id: str):
+    """The Zettle hand-off screen: every order waiting to be charged, with the
+    exact amount to key into the reader. Two taps, no till, and whoever is
+    nearest can do it — a runner, a cook, nobody dedicated."""
+    project = _project_or_404(project_id)
+    return templates.TemplateResponse(request, "counter.html", {"project": project})
+
+
+@app.get("/pass/{project_id}", response_class=HTMLResponse)
+def pass_screen(request: Request, project_id: str):
+    """Reception iPad. No till any more, but somebody still has to carry plates
+    to the right table and put the right food in the right bag — this screen
+    answers only that, for orders the kitchen has marked ready."""
+    project = _project_or_404(project_id)
+    return templates.TemplateResponse(request, "pass.html", {"project": project})
+
+
+@app.get("/api/counter/{project_id}/unsettled")
+def counter_unsettled(project_id: str):
+    _project_or_404(project_id)
+    return {"orders": db.get_unsettled_orders(project_id)}
 
 
 @app.get("/api/kitchen/{project_id}/orders")
@@ -309,8 +345,9 @@ def panel(request: Request, project_id: str):
 
 @app.get("/kiosk/{project_id}", response_class=HTMLResponse)
 def kiosk(request: Request, project_id: str):
-    """Counter iPad: the same ordering UI framed for staff or self-serve use.
-    Reuses the site page; ?kiosk=1 tells the front-end to run in kiosk mode."""
+    """Reception iPad in self-hosting mode: the guest orders and pays themselves,
+    eat-here or takeaway, and walks away with a number. Same ordering UI as the
+    public site — kiosk=True only changes framing and defaults."""
     project = _project_or_404(project_id)
     return templates.TemplateResponse(request, "site.html", {
         "project_id": project_id,
@@ -336,13 +373,25 @@ async def cloudprnt_poll(project_id: str):
 
 
 @app.get("/api/cloudprnt/{project_id}", response_class=PlainTextResponse)
-def cloudprnt_job(project_id: str):
+def cloudprnt_job(project_id: str, role: str = "both"):
+    """One printer at the reception iPad prints both documents per order: the
+    guest's number slip (they carry it to their table) and the kitchen ticket.
+    A second printer in the kitchen can poll with ?role=kitchen instead."""
     project = _project_or_404(project_id)
     order = db.get_next_unprinted_order(project_id)
     if order is None:
         return Response(status_code=204)
-    ticket = receipt.kitchen_ticket(order, project["name"])
-    return PlainTextResponse(ticket, media_type="text/plain; charset=utf-8")
+    spec = project["spec"]
+    docs = []
+    if role in ("both", "guest"):
+        docs.append(receipt.guest_slip(order, spec["business_name"], spec.get("contact", {})))
+    if role in ("both", "kitchen"):
+        docs.append(receipt.kitchen_ticket(order, project["name"]))
+        # Takeaway also needs a label for the bag itself — reception hands bags
+        # over by number and name, and can't read the guest's own slip.
+        if order["customer"].get("mode") != "dine_in":
+            docs.append(receipt.bag_label(order))
+    return PlainTextResponse("".join(docs), media_type="text/plain; charset=utf-8")
 
 
 @app.delete("/api/cloudprnt/{project_id}")
@@ -363,10 +412,11 @@ def receipt_page(request: Request, order_id: str):
         raise HTTPException(404, "Order not found")
     project = _project_or_404(order["project_id"])
     spec = project["spec"]
-    text = receipt.customer_receipt(order, spec["business_name"], spec.get("contact", {}))
-    kitchen = receipt.kitchen_ticket(order, project["name"])
     return templates.TemplateResponse(request, "receipt.html", {
-        "receipt_text": text, "kitchen_text": kitchen, "order_id": order_id,
+        "receipt_text": receipt.guest_slip(order, spec["business_name"], spec.get("contact", {})),
+        "kitchen_text": receipt.kitchen_ticket(order, project["name"]),
+        "order_no": receipt.order_no(order),
+        "order_id": order_id,
     })
 
 
@@ -384,12 +434,14 @@ def orders(request: Request, project_id: str):
 
 @app.post("/api/admin/{project_id}/orders/{order_id}/settle")
 def settle_order(project_id: str, order_id: str):
-    """Staff took payment on Zettle for a dine-in order → mark it paid here."""
+    """The order was charged on the Zettle reader → mark it paid here. Zettle is
+    the certified register that records the sale; we only mirror the outcome so
+    the kitchen and the TV board know the guest is good to go."""
     _project_or_404(project_id)
     order = db.get_order(order_id)
     if order is None or order["project_id"] != project_id:
         raise HTTPException(404, "Order not found")
-    db.mark_order_paid(order_id)
+    db.mark_order_paid(order_id, paid_via="zettle")
     return {"ok": True}
 
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kvitto #{{ order_id[:6] }}</title>
+<title>Nummer {{ order_no }}</title>
 <style>
   body { font-family: 'Courier New', monospace; background: #eee; margin: 0; padding: 20px; }
   .paper { background: #fff; width: 320px; margin: 0 auto 16px; padding: 16px; white-space: pre;
@@ -22,9 +22,9 @@
 <div class="bar">
   <button class="print" onclick="window.print()">🖨️ Skriv ut</button>
 </div>
+<p class="klabel">Gästens nummerlapp</p>
+<div class="paper">{{ receipt_text }}</div>
 <p class="klabel">Köksbong</p>
 <div class="paper">{{ kitchen_text }}</div>
-<p class="klabel">Kundkvitto</p>
-<div class="paper">{{ receipt_text }}</div>
 </body>
 </html>

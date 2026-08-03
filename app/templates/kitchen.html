@@ -16,7 +16,9 @@
   .card.preparing { border-left-color: #4d9fdb; }
   .card.ready { border-left-color: #52b788; }
   .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-  .oid { font-weight: 700; font-size: 1.05rem; }
+  .oid { font-weight: 700; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+  .unpaid { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #f0d570;
+            border: 1px solid #6b5c1e; border-radius: 999px; padding: 1px 8px; }
   .age { font-size: .8rem; color: #8d94a0; }
   .mode { display: inline-block; font-size: .75rem; padding: 2px 10px; border-radius: 999px;
           background: #3a404a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
@@ -79,7 +81,9 @@ async function refresh() {
       ? `<button class="b-ready" onclick="setStatus('${o.id}','ready')">Klar ✓</button>`
       : `<button class="b-done" onclick="setStatus('${o.id}','completed')">Utlämnad ✓✓</button>`;
     return `<div class="card ${o.fulfillment}">
-      <div class="head"><span class="oid">#${o.id.slice(0,6)}</span><span class="age">${age(o.created_at)}</span></div>
+      <div class="head"><span class="oid">#${o.order_no ?? o.id.slice(0,4).toUpperCase()}</span>
+        ${o.status === "unpaid" ? '<span class="unpaid">ej betald</span>' : ""}
+        <span class="age">${age(o.created_at)}</span></div>
       <span class="mode ${o.customer.mode}">${modeTxt}${where ? " · " + where : ""}${when}</span>
       ${o.items.filter(i => i.id !== "_delivery").map(i =>
         `<div class="line"><span class="q">${i.qty}×</span><span>${i.name}</span></div>`).join("")}

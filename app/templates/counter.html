@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kassa — {{ project.name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #14160f; color: #f4f1e8;
+         padding: 20px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  h1 { font-size: 1.3rem; }
+  .sub { color: #8d8879; font-size: .85rem; }
+  .note { background: #23261a; border-left: 4px solid #e0a11b; border-radius: 8px; padding: 10px 14px;
+          font-size: .8rem; color: #cfc9b6; margin-bottom: 18px; max-width: 720px; }
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: #23261a; border-radius: 14px; padding: 18px 20px; border-left: 6px solid #e0a11b; }
+  .top { display: flex; align-items: baseline; gap: 12px; }
+  .no { font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: #f0d570;
+        line-height: 1; }
+  .age { margin-left: auto; font-size: .8rem; color: #8d8879; }
+  .mode { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: #b9b3a1; }
+  /* The amount to key into the Zettle reader — the one number that must not be misread. */
+  .amt { font-size: 2.4rem; font-weight: 800; margin: 12px 0 4px; }
+  .lines { font-size: .85rem; color: #b9b3a1; }
+  .lines div { padding: 1px 0; }
+  button { width: 100%; margin-top: 14px; padding: 16px; border: 0; border-radius: 10px;
+           background: #52b788; color: #06210f; font-size: 1.05rem; font-weight: 700; cursor: pointer; }
+  .empty { color: #8d8879; text-align: center; padding: 70px 0; grid-column: 1/-1; font-size: 1.1rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>💳 {{ project.name }} — att betala</h1>
+  <span class="sub">uppdateras var 3:e sekund</span>
+</header>
+<div class="note">
+  Ta betalt på Zettle-terminalen med beloppet nedan, tryck sedan <b>Betald</b>.
+  Zettle är det certifierade kassaregistret — kvittot kommer därifrån, inte härifrån.
+</div>
+<div class="board" id="board"><p class="empty">Inget att betala just nu</p></div>
+<script>
+const PID = "{{ project.id }}";
+const MODE_LABEL = { pickup: "Ta med", delivery: "Leverans", dine_in: "Äta här" };
+
+function age(ts) {
+  const m = Math.floor((Date.now() / 1000 - ts) / 60);
+  return m < 1 ? "nu" : m + " min";
+}
+
+async function settle(id, btn) {
+  btn.disabled = true;
+  btn.textContent = "Sparar…";
+  await fetch(`/api/admin/${PID}/orders/${id}/settle`, { method: "POST" });
+  refresh();
+}
+
+async function refresh() {
+  const res = await fetch(`/api/counter/${PID}/unsettled`);
+  const { orders } = await res.json();
+  const board = document.getElementById("board");
+  if (!orders.length) {
+    board.innerHTML = '<p class="empty">Inget att betala just nu</p>';
+    return;
+  }
+  board.innerHTML = orders.map(o => {
+    const where = o.customer.mode === "dine_in" && o.customer.table
+      ? ` · bord ${o.customer.table}` : "";
+    return `<div class="card">
+      <div class="top">
+        <span class="no">${o.order_no ?? o.id.slice(0, 4).toUpperCase()}</span>
+        <span class="mode">${MODE_LABEL[o.customer.mode] || o.customer.mode}${where}</span>
+        <span class="age">${age(o.created_at)}</span>
+      </div>
+      <div class="amt">${o.total.toFixed(0)} ${o.currency}</div>
+      <div class="lines">${o.items.filter(i => i.id !== "_delivery")
+        .map(i => `<div>${i.qty}× ${i.name}</div>`).join("")}</div>
+      <button onclick="settle('${o.id}', this)">Betald på Zettle ✓</button>
+    </div>`;
+  }).join("");
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

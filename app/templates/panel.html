@@ -48,16 +48,25 @@
     </div>
 
     <div class="card">
-      <span class="dev">Disk-iPad</span><h3>Kiosk — beställ vid disken</h3>
-      <p>Gästen beställer och betalar själv. Ersätter kassabiträdet i lugna tider.</p>
+      <span class="dev">iPad 1 — receptionen</span><h3>Kiosk — gästen beställer själv</h3>
+      <p>Gästen väljer äta här eller ta med, betalar med kort/Swish direkt, och får ett nummer.
+         Ingen bemannad kassa.</p>
       <a href="/kiosk/{{ project.id }}" target="_blank">Öppna kiosk</a>
       <span class="path">/kiosk/{{ project.id }}</span>
     </div>
 
+    <div class="card">
+      <span class="dev">iPad 1 — Zettle-terminalen</span><h3>Att betala i restaurangen</h3>
+      <p>För gäster som vill betala fysiskt: visar beloppet att ta på Zettle-läsaren, ett tryck för
+         "Betald". Zettle är det certifierade kassaregistret — kvittot kommer därifrån.</p>
+      <a href="/counter/{{ project.id }}" target="_blank">Öppna kassaskärm</a>
+      <span class="path">/counter/{{ project.id }}</span>
+    </div>
+
     {% for s in stations %}
     <div class="card">
-      <span class="dev">Kök-iPad</span><h3>Köksskärm — {{ s }}</h3>
-      <p>Visar bara {{ s }}-rätter. Bongar dyker upp när betalning är klar.</p>
+      <span class="dev">Kök-iPad — {{ s }}</span><h3>Köksskärm — {{ s }}</h3>
+      <p>Visar bara {{ s }}-rätter, med ordernumret överst. Tryck "Klar" så visas numret på TV:n.</p>
       <a href="/kitchen/{{ project.id }}?station={{ s }}" target="_blank">Öppna {{ s }}</a>
       <span class="path">/kitchen/{{ project.id }}?station={{ s }}</span>
     </div>
@@ -65,13 +74,21 @@
 
     <div class="card">
       <span class="dev">Apple TV</span><h3>Gästskärm (TV)</h3>
-      <p>Ordernummer: "Tillagas" → "Klar för avhämtning". Öppna i Safari på Apple TV.</p>
+      <p>Numren vandrar "Tillagas" → "Klar — hämta din mat", som hos Max. Öppna i Safari på Apple TV.</p>
       <a href="/display/{{ project.id }}" target="_blank">Öppna TV-skärm</a>
       <span class="path">/display/{{ project.id }}</span>
     </div>
 
     <div class="card">
-      <span class="dev">Reception / ägare</span><h3>Beställningar & kunder</h3>
+      <span class="dev">iPad 2 — receptionen</span><h3>Utlämning — vart maten ska</h3>
+      <p>Klar mat delas i två spalter: bär ut till bordet, eller packa i påse och ropa numret.
+         Påsetiketten skrivs ut med nummer och namn.</p>
+      <a href="/pass/{{ project.id }}" target="_blank">Öppna receptionsskärm</a>
+      <span class="path">/pass/{{ project.id }}</span>
+    </div>
+
+    <div class="card">
+      <span class="dev">Ägare</span><h3>Beställningar & kunder</h3>
       <p>Alla ordrar, status, och återkommande stamkunder (CRM).</p>
       <a href="/admin/{{ project.id }}/orders" target="_blank">Beställningar</a>
       <span class="path">/admin/{{ project.id }}/orders  ·  /admin/{{ project.id }}/customers</span>

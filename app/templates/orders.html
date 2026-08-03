@@ -16,6 +16,9 @@
   .status { font-size: .75rem; padding: 2px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
   .status.paid { background: #dcefe0; color: #22593a; }
   .status.pending { background: #fbeecf; color: #8a6414; }
+  .status.unpaid { background: #f7e0d6; color: #8a3a14; }
+  .order .id { font-variant-numeric: tabular-nums; }
+  .head .when { font-family: ui-monospace, monospace; font-size: .72rem; }
   .head .when { color: #9b968a; font-size: .85rem; margin-left: auto; }
   .line { display: flex; justify-content: space-between; font-size: .9rem; padding: 2px 0; }
   .cust { margin-top: 8px; font-size: .85rem; color: #6b675e; }
@@ -30,12 +33,13 @@
      <a class="back" href="/admin/{{ project.id }}/customers">kunder</a></p>
 
   {% if unsettled %}
-  <h2 style="font-family:Georgia,serif;color:#c96f4a;font-size:1.1rem;margin:8px 0 10px">Att betala i restaurangen (Zettle)</h2>
+  <h2 style="font-family:Georgia,serif;color:#c96f4a;font-size:1.1rem;margin:8px 0 10px">
+    Att betala i restaurangen (Zettle) — <a class="back" href="/counter/{{ project.id }}">öppna kassaskärmen</a></h2>
   {% for o in unsettled %}
   <div class="order" style="border-left:4px solid #c96f4a">
     <div class="head">
-      <span class="id">#{{ o.id[:6] }}</span>
-      <span>Bord {{ o.customer.table }}</span>
+      <span class="id">#{{ o.order_no or o.id[:4] | upper }}</span>
+      <span>{{ {'dine_in': 'Äta här', 'pickup': 'Ta med', 'delivery': 'Leverans'}.get(o.customer.mode, o.customer.mode) }}{% if o.customer.table %} · bord {{ o.customer.table }}{% endif %}</span>
       <span>{{ '%g' % o.total }} {{ o.currency }}</span>
       <button onclick="settle('{{ o.id }}')" style="margin-left:auto;background:#2f4436;color:#fff;border:0;padding:6px 14px;border-radius:6px;cursor:pointer">Markera betald</button>
     </div>
@@ -52,10 +56,10 @@
   {% for o in orders %}
   <div class="order">
     <div class="head">
-      <span class="id">#{{ o.id }}</span>
-      <span class="status {{ o.status }}">{{ o.status }}</span>
+      <span class="id">#{{ o.order_no or o.id[:4] | upper }}</span>
+      <span class="status {{ o.status }}">{{ o.status }}{% if o.paid_via %} · {{ o.paid_via }}{% endif %}</span>
       <span>{{ '%g' % o.total }} {{ o.currency }}</span>
-      <span class="when">{{ o.created_at | int }}</span>
+      <span class="when">{{ o.id }}</span>
     </div>
     {% for it in o['items'] %}
     <div class="line"><span>{{ it.qty }} × {{ it.name }}</span><span>{{ '%g' % (it.price * it.qty) }} {{ o.currency }}</span></div>

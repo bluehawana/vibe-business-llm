@@ -43,15 +43,31 @@ def init_db():
         );
         """)
         # fulfillment: new -> preparing -> ready -> completed (kitchen display flow)
-        for col, ddl in [
-            ("fulfillment", "ALTER TABLE orders ADD COLUMN fulfillment TEXT NOT NULL DEFAULT 'new'"),
+        for ddl in [
+            "ALTER TABLE orders ADD COLUMN fulfillment TEXT NOT NULL DEFAULT 'new'",
             # printed: has this order's kitchen ticket been sent to a thermal printer yet
-            ("printed", "ALTER TABLE orders ADD COLUMN printed INTEGER NOT NULL DEFAULT 0"),
+            "ALTER TABLE orders ADD COLUMN printed INTEGER NOT NULL DEFAULT 0",
+            # order_no + service_day: the short human number the guest is called by
+            # ("#118"), unique per restaurant per service day. The uuid `id` stays
+            # the URL/webhook key — order_no is only ever shown to people.
+            "ALTER TABLE orders ADD COLUMN order_no INTEGER",
+            "ALTER TABLE orders ADD COLUMN service_day TEXT NOT NULL DEFAULT ''",
+            # serve_now: the guest is physically here (table QR or counter iPad), so
+            # the kitchen starts immediately instead of waiting for payment to clear.
+            "ALTER TABLE orders ADD COLUMN serve_now INTEGER NOT NULL DEFAULT 0",
+            # paid_via: 'stripe' | 'zettle' — which register the money went through.
+            "ALTER TABLE orders ADD COLUMN paid_via TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 conn.execute(ddl)
             except sqlite3.OperationalError:
                 pass  # column already exists
+        # Pre-order-number rows: give them a number so no screen shows a blank.
+        conn.execute("UPDATE orders SET order_no = CAST(SUBSTR(id, 1, 4) AS INTEGER)"
+                     " WHERE order_no IS NULL")
+        # Legacy 'in_store' status (dine-in only lane) -> 'unpaid' + serve_now.
+        conn.execute("UPDATE orders SET status = 'unpaid', serve_now = 1 WHERE status = 'in_store'")
+        conn.execute("UPDATE orders SET paid_via = 'stripe' WHERE status = 'paid' AND paid_via = ''")
 
 
 def create_project(name: str, spec: dict) -> str:
@@ -97,23 +113,55 @@ def get_messages(project_id: str) -> list[dict]:
     return [{"role": r["role"], "content": r["content"]} for r in rows]
 
 
+# Order numbers restart every service day. 101 rather than 1: a three-digit
+# number reads as a real ticket and can't be mistaken for a table or a quantity.
+FIRST_ORDER_NO = 101
+# A restaurant's day ends when it closes, not at midnight — an order taken at
+# 00:30 belongs to the evening that is still running.
+SERVICE_DAY_ROLLOVER_H = 4
+
+
+def service_day(ts: float) -> str:
+    return time.strftime("%Y-%m-%d", time.localtime(ts - SERVICE_DAY_ROLLOVER_H * 3600))
+
+
 def create_order(project_id: str, items: list, customer: dict, total: float,
-                 currency: str, status: str, stripe_session_id: str | None = None) -> str:
+                 currency: str, status: str, stripe_session_id: str | None = None,
+                 serve_now: bool = False) -> str:
     order_id = uuid.uuid4().hex[:10]
-    with _connect() as conn:
+    now = time.time()
+    day = service_day(now)
+    conn = _connect()
+    try:
+        # BEGIN IMMEDIATE takes the write lock before we read the highest number,
+        # so two guests tapping "Beställ" at once can't be handed the same one.
+        conn.isolation_level = None
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT MAX(order_no) AS n FROM orders WHERE project_id = ? AND service_day = ?",
+            (project_id, day),
+        ).fetchone()
+        order_no = (row["n"] or FIRST_ORDER_NO - 1) + 1
         conn.execute(
-            "INSERT INTO orders (id, project_id, items, customer, total, currency, status, stripe_session_id, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO orders (id, project_id, items, customer, total, currency, status,"
+            " stripe_session_id, created_at, order_no, service_day, serve_now)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (order_id, project_id, json.dumps(items, ensure_ascii=False),
              json.dumps(customer, ensure_ascii=False), total, currency, status,
-             stripe_session_id, time.time()),
+             stripe_session_id, now, order_no, day, int(serve_now)),
         )
+        conn.execute("COMMIT")
+    finally:
+        conn.close()
     return order_id
 
 
-def mark_order_paid(order_id: str):
+def mark_order_paid(order_id: str, paid_via: str = ""):
+    """paid_via records which register took the money: 'stripe' (online, distance
+    sale) or 'zettle' (the certified in-store register)."""
     with _connect() as conn:
-        conn.execute("UPDATE orders SET status = 'paid' WHERE id = ?", (order_id,))
+        conn.execute("UPDATE orders SET status = 'paid', paid_via = ? WHERE id = ?",
+                     (paid_via, order_id))
 
 
 FULFILLMENT_STATES = ("new", "preparing", "ready", "completed")
@@ -126,13 +174,18 @@ def set_fulfillment(order_id: str, state: str):
         conn.execute("UPDATE orders SET fulfillment = ? WHERE id = ?", (state, order_id))
 
 
+# An order is cooked when the money is in ('paid'), or when the guest is standing
+# in the restaurant ('unpaid' + serve_now) and will settle on the reader in a
+# minute. A remote order that hasn't paid is never cooked — that is just a
+# stranger who might turn up.
+_COOKABLE = "(status = 'paid' OR (status = 'unpaid' AND serve_now = 1))"
+
+
 def get_active_orders(project_id: str) -> list[dict]:
-    """What the kitchen display shows: prepaid online orders (status 'paid') plus
-    dine-in orders being settled in-store on Zettle (status 'in_store') — the
-    latter are cooked immediately because the guest is seated."""
+    """What the kitchen display and the TV board show."""
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM orders WHERE project_id = ? AND status IN ('paid', 'in_store')"
+            f"SELECT * FROM orders WHERE project_id = ? AND {_COOKABLE}"
             " AND fulfillment != 'completed' ORDER BY created_at",
             (project_id,),
         ).fetchall()
@@ -140,21 +193,20 @@ def get_active_orders(project_id: str) -> list[dict]:
 
 
 def get_unsettled_orders(project_id: str) -> list[dict]:
-    """Dine-in orders awaiting payment at the counter (settle on Zettle)."""
+    """Orders waiting to be charged on the Zettle reader, oldest first."""
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM orders WHERE project_id = ? AND status = 'in_store' ORDER BY created_at",
+            "SELECT * FROM orders WHERE project_id = ? AND status = 'unpaid' ORDER BY created_at",
             (project_id,),
         ).fetchall()
     return [_order_dict(r) for r in rows]
 
 
 def get_next_unprinted_order(project_id: str):
-    """Oldest active order whose kitchen ticket hasn't printed yet (Star CloudPRNT).
-    Covers prepaid online orders and in-store dine-in orders alike."""
+    """Oldest cookable order whose ticket hasn't printed yet (Star CloudPRNT)."""
     with _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM orders WHERE project_id = ? AND status IN ('paid', 'in_store')"
+            f"SELECT * FROM orders WHERE project_id = ? AND {_COOKABLE}"
             " AND printed = 0 ORDER BY created_at LIMIT 1",
             (project_id,),
         ).fetchone()
@@ -215,5 +267,8 @@ def _order_dict(row) -> dict:
         "status": row["status"],
         "fulfillment": row["fulfillment"] if "fulfillment" in keys else "new",
         "printed": bool(row["printed"]) if "printed" in keys else False,
+        "order_no": row["order_no"] if "order_no" in keys else None,
+        "serve_now": bool(row["serve_now"]) if "serve_now" in keys else False,
+        "paid_via": row["paid_via"] if "paid_via" in keys else "",
         "created_at": row["created_at"],
     }

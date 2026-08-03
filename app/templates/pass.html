@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reception — {{ project.name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #14160f; color: #f4f1e8;
+         display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; flex-wrap: wrap; }
+  h1 { font-size: 1.2rem; }
+  .sub { color: #8d8879; font-size: .82rem; }
+  .cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; background: #2a2c22;
+          min-height: 0; }
+  .col { background: #14160f; padding: 14px 18px; overflow-y: auto; }
+  .col h2 { font-size: 1.05rem; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 3px solid;
+            position: sticky; top: 0; background: #14160f; }
+  .col.table h2 { color: #7fb3e0; border-color: #7fb3e0; }
+  .col.bag h2 { color: #e0a11b; border-color: #e0a11b; }
+  .card { background: #23261a; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+          border-left: 6px solid; }
+  .col.table .card { border-left-color: #7fb3e0; }
+  .col.bag .card { border-left-color: #e0a11b; }
+  .top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .no { font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .col.table .no { color: #a8d4f7; } .col.bag .no { color: #f0d570; }
+  /* Where it goes is the single thing this screen exists to answer. */
+  .dest { font-size: 1.25rem; font-weight: 700; }
+  .who { color: #b9b3a1; font-size: .9rem; }
+  .age { margin-left: auto; font-size: .78rem; color: #8d8879; }
+  .lines { margin-top: 10px; font-size: .9rem; color: #cfc9b6; }
+  .lines div { padding: 1px 0; }
+  .warn { display: inline-block; margin-top: 8px; font-size: .72rem; text-transform: uppercase;
+          letter-spacing: .05em; color: #f0d570; border: 1px solid #6b5c1e; border-radius: 999px;
+          padding: 1px 9px; }
+  button { width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 9px;
+           background: #52b788; color: #06210f; font-size: .98rem; font-weight: 700; cursor: pointer; }
+  .empty { color: #8d8879; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛎️ {{ project.name }} — reception</h1>
+  <span class="sub">Klar mat: vart den ska. Uppdateras var 3:e sekund.</span>
+</header>
+<div class="cols">
+  <div class="col table"><h2>🍽️ Bär ut till bordet</h2><div id="tables"></div></div>
+  <div class="col bag"><h2>🥡 Packa i påse — ropa numret</h2><div id="bags"></div></div>
+</div>
+<script>
+const PID = "{{ project.id }}";
+
+function age(ts) {
+  const m = Math.floor((Date.now() / 1000 - ts) / 60);
+  return m < 1 ? "nu" : m + " min";
+}
+
+async function done(id, btn) {
+  btn.disabled = true;
+  btn.textContent = "Sparar…";
+  await fetch(`/api/kitchen/${PID}/orders/${id}/status`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ state: "completed" }),
+  });
+  refresh();
+}
+
+function card(o, kind) {
+  const c = o.customer;
+  const no = o.order_no ?? o.id.slice(0, 4).toUpperCase();
+  const dest = kind === "table"
+    ? (c.table ? `Bord ${c.table}` : "Äta här")
+    : (c.mode === "delivery" ? `Leverans · ${c.address || ""}` : "Ta med");
+  const who = [c.name, c.phone].filter(Boolean).join(" · ");
+  const when = c.pickup_time && c.pickup_time !== "ASAP" ? ` · hämtas ${c.pickup_time}` : "";
+  // Reception must not hand over food that hasn't been paid for.
+  const unpaid = o.status === "unpaid"
+    ? '<span class="warn">Ej betald — betalas i terminalen</span>' : "";
+  return `<div class="card">
+    <div class="top">
+      <span class="no">${no}</span>
+      <span class="dest">${dest}${when}</span>
+      <span class="age">${age(o.created_at)}</span>
+    </div>
+    ${who ? `<div class="who">${who}</div>` : ""}
+    <div class="lines">${o.items.filter(i => i.id !== "_delivery")
+      .map(i => `<div>${i.qty}× ${i.name}</div>`).join("")}</div>
+    ${unpaid}
+    <button onclick="done('${o.id}', this)">Utlämnad ✓</button>
+  </div>`;
+}
+
+async function refresh() {
+  let orders;
+  try {
+    orders = (await (await fetch(`/api/kitchen/${PID}/orders`)).json()).orders;
+  } catch { return; }
+  const ready = orders.filter(o => o.fulfillment === "ready");
+  const toTable = ready.filter(o => o.customer.mode === "dine_in");
+  const toBag = ready.filter(o => o.customer.mode !== "dine_in");
+  const render = (el, list) => {
+    el.innerHTML = list.length
+      ? list.map(o => card(o, el.id === "tables" ? "table" : "bag")).join("")
+      : '<p class="empty">Inget klart just nu</p>';
+  };
+  render(document.getElementById("tables"), toTable);
+  render(document.getElementById("bags"), toBag);
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
