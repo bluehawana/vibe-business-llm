@@ -188,12 +188,46 @@ Open `/panel/<project-id>` on the mini — it lists every screen with its URL.
 | **iPad 2 — reception (hand-out)** | `/pass/<id>` | To table 4 · or bag "106 · Yan" |
 | **iPad 3 — sushi bar** | `/kitchen/<id>?station=sushi` | Sushi dishes only |
 | **iPad 4 — hot kitchen** | `/kitchen/<id>?station=kitchen` | Hot dishes only |
-| **Apple TV (Safari)** | `/display/<id>` | Tillagas → Klar, Max-style |
+| **TV** (see §7b) | `/display/<id>` | Preparing → Ready, Max-style |
 | **Table QR codes** | `/site/<id>?table=NR` | Skips the eat-in question |
 | **Guest phones** | `https://order.ichiban.biz/site/<id>` | |
 
 Add each to the Home Screen (Share → "Lägg till på hemskärmen") so it runs
 full-screen. Use **Guided Access** on the kiosk so guests can't wander off the page.
+
+## 7b. Getting the board onto the TV
+
+**Apple TV cannot do this.** tvOS has no web browser and never has — don't plan
+around one. Pick one of these instead:
+
+| Option | Cost | Notes |
+|---|---|---|
+| **Raspberry Pi 4 → HDMI** | owned | ✅ Recommended. Boots into the board, survives power cuts, no one touches it again. |
+| Smart TV's own browser | free | Samsung/LG have one. Most forget the page on power-cycle, so someone re-opens it daily. |
+| Fire TV Stick 4K + Silk | ~500 kr | Plug-and-play, remembers its page. Buy this if you'd rather not touch Linux. |
+| Apple TV + AirPlay mirroring | owned | Works, but burns an iPad as a video source and drops when it sleeps. Demo only. |
+
+Raspberry Pi setup — Raspberry Pi OS Desktop, autologin to desktop:
+
+```bash
+sudo apt install -y chromium-browser unclutter
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/vibe-display.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Vibe order board
+Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars \
+  --disable-session-crashed-bubble --check-for-update-interval=31536000 \
+  http://192.168.1.50:8100/display/<project-id>
+X-GNOME-Autostart-enabled=true
+EOF
+```
+
+Then `sudo raspi-config` → Display → Screen Blanking → **off**. Power the Pi from
+the TV's USB port so it comes up with the TV.
+
+`/display` is deliberately outside the staff login — a signage box has no
+keyboard to type a password on, and the board shows nothing but order numbers.
 
 ## 8. Printing
 
