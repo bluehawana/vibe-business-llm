@@ -19,7 +19,7 @@ final class AppConfig: ObservableObject {
     private let defaults = UserDefaults.standard
 
     private init() {
-        serverURL = defaults.string(forKey: "serverURL") ?? "http://192.168.1.103:8100"
+        serverURL = defaults.string(forKey: "serverURL") ?? "https://order.ichiban.biz"
         projectID = defaults.string(forKey: "projectID") ?? "db3c418e95a6"
     }
 

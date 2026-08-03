@@ -135,7 +135,7 @@ struct BoardSetupView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Server URL").font(.headline)
-                TextField("http://192.168.1.50:8100", text: $settings.serverURL)
+                TextField("https://order.ichiban.biz", text: $settings.serverURL)
                     .textContentType(.URL)
             }
             VStack(alignment: .leading, spacing: 8) {

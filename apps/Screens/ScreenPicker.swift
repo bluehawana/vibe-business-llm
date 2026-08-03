@@ -27,7 +27,7 @@ struct ScreenPicker: View {
 
                 Section {
                     LabeledContent("Address") {
-                        TextField("http://192.168.1.50:8100", text: $config.serverURL)
+                        TextField("https://order.ichiban.biz", text: $config.serverURL)
                             .multilineTextAlignment(.trailing)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
