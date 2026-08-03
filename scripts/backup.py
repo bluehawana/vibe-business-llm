@@ -41,6 +41,38 @@ projects = conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
 conn.close(); check.unlink()
 print(f"{stamp}  ok  {projects} projects, {orders} orders")
 
+# Off-site: same-disk snapshots survive a bad deploy, not a dead machine.
+# No-ops silently when R2 isn't configured, so the local backup never fails
+# because of a credential problem.
+def upload_to_r2(path: Path) -> str:
+    import os
+    account = os.environ.get("R2_ACCOUNT_ID", "")
+    key_id = os.environ.get("R2_ACCESS_KEY_ID", "")
+    secret = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+    bucket = os.environ.get("R2_BUCKET", "")
+    if not all([account, key_id, secret, bucket]):
+        return "r2 not configured"
+    try:
+        import boto3
+    except ImportError:
+        return "r2 skipped (boto3 not installed)"
+    try:
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=f"https://{account}.r2.cloudflarestorage.com",
+            aws_access_key_id=key_id,
+            aws_secret_access_key=secret,
+            region_name="auto",
+        )
+        s3.upload_file(str(path), bucket, f"vibe/{path.name}")
+        return f"uploaded to r2://{bucket}/vibe/{path.name}"
+    except Exception as e:
+        # Never let an off-site failure hide the fact that the local one worked.
+        return f"r2 FAILED: {type(e).__name__}: {e}"
+
+
+print("   ", upload_to_r2(Path(f"{tmp}.gz")))
+
 hourly = sorted(DEST.glob("vibe-*.db.gz"))
 for old in hourly[:-KEEP_HOURLY]:
     # keep one per day before deleting the rest

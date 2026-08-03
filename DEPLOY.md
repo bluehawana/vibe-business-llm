@@ -264,14 +264,27 @@ gunzip -c ~/backups/vibe/vibe-YYYYMMDD-HHMM.db.gz > ~/vibe-business-llm/data/vib
 sudo systemctl restart vibe
 ```
 
-⚠️ **These live on the same disk as the database.** That protects you from a bad
-deploy, a bug, or a mistaken delete — not from losing the machine. Add an
-off-site pull from a machine you control:
+Same-disk snapshots protect you from a bad deploy, a bug or a mistaken delete —
+not from losing the machine. **Cloudflare R2** closes that gap: S3-compatible,
+free egress, and 10 GB free against backups that are 27 KB each.
 
-```bash
-# on the Mac mini at home, in crontab
-0 4 * * * rsync -az racknerd:~/backups/vibe/ ~/ichiban-backups/
+1. Cloudflare → **R2** → Create bucket, name it `ichiban-backups`
+2. R2 → **Manage API tokens** → Create token, **Object Read & Write**, scoped to
+   that bucket
+3. Put the four values in `.env` on the server:
+
 ```
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=ichiban-backups
+```
+
+4. `.venv/bin/pip install boto3`
+
+The next hourly run uploads automatically. Without those variables the local
+backup still runs and simply prints `r2 not configured` — an off-site problem
+must never be able to break the backup that does work.
 
 ## 10. Going live checklist
 
