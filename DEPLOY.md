@@ -251,15 +251,27 @@ and the browser print dialog until you have a network Star.
 
 The whole business is one SQLite file, `data/vibe.db`.
 
+`scripts/backup.py` runs hourly from cron (`17 * * * *`). It uses SQLite's own
+backup API rather than `cp` — copying a live database can capture a half-written
+transaction and restore as corrupt — then gzips it and **verifies the result by
+opening it and counting rows**. Keeps 48 hourly and 30 daily snapshots in
+`~/backups/vibe/`.
+
+Restore is one command:
+
 ```bash
-# hourly local snapshot
-sqlite3 data/vibe.db ".backup $HOME/backups/vibe-$(date +%H).db"
-# nightly off-site
-rsync -az ~/backups/ vps1:/srv/ichiban-backups/
+gunzip -c ~/backups/vibe/vibe-YYYYMMDD-HHMM.db.gz > ~/vibe-business-llm/data/vibe.db
+sudo systemctl restart vibe
 ```
 
-Put both in `crontab -e`. Restoring is copying the file back — that's the whole
-disaster-recovery plan, and the Dell can be serving within ten minutes.
+⚠️ **These live on the same disk as the database.** That protects you from a bad
+deploy, a bug, or a mistaken delete — not from losing the machine. Add an
+off-site pull from a machine you control:
+
+```bash
+# on the Mac mini at home, in crontab
+0 4 * * * rsync -az racknerd:~/backups/vibe/ ~/ichiban-backups/
+```
 
 ## 10. Going live checklist
 
