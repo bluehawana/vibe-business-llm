@@ -51,12 +51,25 @@ def create_checkout_session(project_id: str, order_id: str, line_items: list[dic
 
 
 def parse_webhook(payload: bytes, sig_header: str):
-    """Returns the order_id of a completed checkout, or None."""
+    """Returns the order_id of a completed checkout, or None.
+
+    This endpoint is what turns an order into 'paid', so an unverified one is a
+    free-food machine: anyone who can reach it could POST a fake
+    checkout.session.completed. It therefore refuses to run unsigned unless we
+    are explicitly in the local demo stub, where no real money exists.
+    """
+    import json
+
     if STRIPE_WEBHOOK_SECRET:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    else:
-        import json
-        event = json.loads(payload)
-    if event["type"] == "checkout.session.completed":
-        return event["data"]["object"]["metadata"].get("order_id")
-    return None
+        # Verify with the SDK, then read the raw payload ourselves. construct_event
+        # hands back a StripeObject, which is not a dict — .get() on it raises
+        # AttributeError, which would 400 every genuine payment.
+        stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    elif not (DEMO_PAYMENTS and not STRIPE_SECRET_KEY):
+        raise RuntimeError(
+            "STRIPE_WEBHOOK_SECRET is not set — refusing to trust an unsigned webhook")
+
+    event = json.loads(payload)
+    if event.get("type") != "checkout.session.completed":
+        return None
+    return event.get("data", {}).get("object", {}).get("metadata", {}).get("order_id")

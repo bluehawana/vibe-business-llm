@@ -6,21 +6,46 @@ The one thing these tests can't cover is Claude's actual output quality; that
 needs the live A/B run with an API key.
 """
 
+import hashlib
+import hmac
 import json
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db, llm, main, stripe_pay
+from app import auth, db, llm, main, stripe_pay
 from app.schema import DEFAULT_SPEC, find_menu_item
 
 client = TestClient(main.app)
+# A guest's browser — never logged in. Used to prove the staff screens are shut.
+guest = TestClient(main.app)
 
 
 @pytest.fixture(autouse=True)
 def demo_payments(monkeypatch):
     """Tests run against the demo payment stub unless a test overrides it."""
     monkeypatch.setattr(stripe_pay, "DEMO_PAYMENTS", True)
+
+
+@pytest.fixture(autouse=True)
+def staff_session():
+    """Most tests exercise staff screens, so `client` stays logged in."""
+    client.cookies.set(auth.COOKIE, auth.session_token())
+
+
+def signed_webhook(payload: str, secret: str) -> dict:
+    """A real Stripe signature header, so webhook tests go through the same
+    verification path production does instead of around it."""
+    ts = int(time.time())
+    sig = hmac.new(secret.encode(), f"{ts}.{payload}".encode(), hashlib.sha256).hexdigest()
+    return {"stripe-signature": f"t={ts},v1={sig}"}
+
+
+def printed(project_id, **params):
+    """The printer authenticates with its own key, not a staff cookie."""
+    params.setdefault("key", auth.printer_key())
+    return params
 
 
 SPEC = json.loads(json.dumps(DEFAULT_SPEC))
@@ -298,10 +323,14 @@ def test_unpaid_order_never_reaches_kitchen(project_id, monkeypatch):
     board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
     assert all(o["id"] != order_id for o in board)
 
-    # Stripe confirms payment via webhook -> now paid -> now the kitchen cooks
-    payload = {"type": "checkout.session.completed",
-               "data": {"object": {"metadata": {"order_id": order_id}}}}
-    assert client.post("/api/stripe/webhook", content=json.dumps(payload)).status_code == 200
+    # Stripe confirms payment via a SIGNED webhook -> paid -> the kitchen cooks
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "whsec_test")
+    # "object": "event" is part of every real Stripe event; the SDK reads it to
+    # tell v1 from v2 events, so a fixture without it never reaches our code.
+    payload = json.dumps({"object": "event", "type": "checkout.session.completed",
+                          "data": {"object": {"metadata": {"order_id": order_id}}}})
+    assert client.post("/api/stripe/webhook", content=payload,
+                       headers=signed_webhook(payload, "whsec_test")).status_code == 200
     assert db.get_order(order_id)["status"] == "paid"
     board2 = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
     assert any(o["id"] == order_id for o in board2)
@@ -342,26 +371,26 @@ def test_cloudprnt_poll_serve_confirm(project_id):
     order_id = order_id_of(r)
 
     # printer polls -> job ready
-    poll = client.post(f"/api/cloudprnt/{project_id}").json()
+    poll = client.post(f"/api/cloudprnt/{project_id}", params=printed(project_id)).json()
     assert poll["jobReady"] is True
     assert poll["jobToken"] == order_id
 
     # printer fetches the job -> plain text with table + items
-    job = client.get(f"/api/cloudprnt/{project_id}")
+    job = client.get(f"/api/cloudprnt/{project_id}", params=printed(project_id))
     assert job.status_code == 200
     assert "Table:" in job.text and "12" in job.text
     assert "Margherita" in job.text
     assert "NOT PAID" in job.text  # settles on the Zettle reader
 
     # a kitchen-only printer gets the ticket without the guest's slip
-    kitchen_only = client.get(f"/api/cloudprnt/{project_id}?role=kitchen").text
+    kitchen_only = client.get(f"/api/cloudprnt/{project_id}", params=printed(project_id, role="kitchen")).text
     assert "KÖK" in kitchen_only and "BESTÄLLNING" not in kitchen_only
     # eat-here food goes on a plate, so no bag label is printed for it
     assert "TAKE AWAY BAG" not in kitchen_only
 
     # printer confirms -> job no longer offered
-    assert client.delete(f"/api/cloudprnt/{project_id}?token={order_id}").status_code == 200
-    assert client.post(f"/api/cloudprnt/{project_id}").json()["jobReady"] is False
+    assert client.delete(f"/api/cloudprnt/{project_id}", params=printed(project_id, token=order_id)).status_code == 200
+    assert client.post(f"/api/cloudprnt/{project_id}", params=printed(project_id)).json()["jobReady"] is False
 
 
 def test_takeaway_prints_a_bag_label_with_number_and_name(project_id):
@@ -369,7 +398,7 @@ def test_takeaway_prints_a_bag_label_with_number_and_name(project_id):
     r = checkout(project_id, mode="pickup", payment="in_store", kiosk=True,
                  customer_name="Yan")
     no = str(db.get_order(order_id_of(r))["order_no"])
-    job = client.get(f"/api/cloudprnt/{project_id}").text
+    job = client.get(f"/api/cloudprnt/{project_id}", params=printed(project_id)).text
     assert "TAKE AWAY BAG" in job
     label = job.split("TAKE AWAY BAG")[1]
     assert no in label and "YAN" in label
@@ -516,7 +545,7 @@ def test_remote_pay_on_arrival_order_waits_for_payment(project_id):
     order_id = order_id_of(r)
     board = client.get(f"/api/kitchen/{project_id}/orders").json()["orders"]
     assert all(o["id"] != order_id for o in board)
-    assert client.post(f"/api/cloudprnt/{project_id}").json()["jobReady"] is False
+    assert client.post(f"/api/cloudprnt/{project_id}", params=printed(project_id)).json()["jobReady"] is False
 
     # once it's charged on the reader, the kitchen picks it up
     client.post(f"/api/admin/{project_id}/orders/{order_id}/settle")
@@ -549,7 +578,7 @@ def test_order_number_reaches_paper_screen_and_tv(project_id):
     # the printable slip
     assert no in client.get(f"/receipt/{order_id}").text
     # the thermal printer job: guest slip AND kitchen ticket, both numbered
-    job = client.get(f"/api/cloudprnt/{project_id}").text
+    job = client.get(f"/api/cloudprnt/{project_id}", params=printed(project_id)).text
     assert job.count(no) >= 2
     assert "BESTÄLLNING" in job and "KÖK" in job
     # the TV reads the number straight off the kitchen feed
@@ -568,3 +597,96 @@ def test_in_store_slip_is_not_presented_as_a_vat_receipt(project_id):
     # a prepaid online order is a distance sale we account for ourselves
     paid_id = order_id_of(checkout(project_id, payment="online"))
     assert "moms" in client.get(f"/receipt/{paid_id}").text
+
+
+# ---------- staff login (the screens that aren't for guests) ----------
+
+STAFF_ONLY = ["/panel/{p}", "/kitchen/{p}", "/counter/{p}", "/pass/{p}", "/kiosk/{p}",
+              "/builder/{p}", "/admin/{p}/orders", "/admin/{p}/customers"]
+STAFF_APIS = ["/api/kitchen/{p}/orders", "/api/counter/{p}/unsettled"]
+
+
+@pytest.mark.parametrize("path", STAFF_ONLY)
+def test_staff_pages_redirect_a_stranger_to_login(project_id, path):
+    r = guest.get(path.format(p=project_id), follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"].startswith("/login?next=")
+
+
+@pytest.mark.parametrize("path", STAFF_APIS)
+def test_staff_apis_reject_a_stranger(project_id, path):
+    assert guest.get(path.format(p=project_id)).status_code == 401
+
+
+def test_a_stranger_cannot_mark_an_order_paid(project_id):
+    """The one that costs money: settling an order is free food if it's open."""
+    order_id = order_id_of(checkout(project_id, payment="in_store", kiosk=True))
+    assert guest.post(f"/api/admin/{project_id}/orders/{order_id}/settle").status_code == 401
+    assert db.get_order(order_id)["status"] == "unpaid"
+
+
+GUEST_OK = ["/site/{p}", "/site/{p}/success", "/display/{p}", "/"]
+
+
+@pytest.mark.parametrize("path", GUEST_OK)
+def test_guest_facing_pages_stay_open(project_id, path):
+    assert guest.get(path.format(p=project_id)).status_code == 200
+
+
+def test_guests_can_order_and_print_their_own_slip(project_id):
+    """Ordering must never require a login — that is the whole product."""
+    r = guest.post(f"/api/site/{project_id}/checkout", json={
+        "items": [{"id": "margherita", "qty": 1}], "mode": "pickup"})
+    assert r.status_code == 200
+    assert guest.get(f"/receipt/{order_id_of(r)}").status_code == 200
+
+
+def test_login_round_trip(project_id):
+    fresh = TestClient(main.app)
+    assert fresh.post("/login", data={"password": "wrong", "next": f"/panel/{project_id}"},
+                      follow_redirects=False).headers["location"].endswith("bad=1")
+    assert fresh.get(f"/panel/{project_id}", follow_redirects=False).status_code == 307
+
+    ok = fresh.post("/login", data={"password": "test-staff-pw", "next": f"/panel/{project_id}"},
+                    follow_redirects=False)
+    assert ok.status_code == 303 and ok.headers["location"] == f"/panel/{project_id}"
+    assert fresh.get(f"/panel/{project_id}").status_code == 200
+
+    fresh.get("/logout")
+    assert fresh.get(f"/panel/{project_id}", follow_redirects=False).status_code == 307
+
+
+def test_printer_needs_its_own_key(project_id):
+    checkout(project_id, payment="in_store", kiosk=True)
+    assert guest.post(f"/api/cloudprnt/{project_id}").status_code == 401
+    assert guest.get(f"/api/cloudprnt/{project_id}?key=guessed").status_code == 401
+    # the real key works without any staff cookie, and rotates with the password
+    ok = guest.post(f"/api/cloudprnt/{project_id}?key={auth.printer_key()}")
+    assert ok.status_code == 200 and ok.json()["jobReady"] is True
+
+
+def test_staff_screens_fail_closed_with_no_password(project_id, monkeypatch):
+    """Better to be switched off than silently open behind a public URL."""
+    monkeypatch.setattr(auth, "STAFF_PASSWORD", "")
+    assert client.get(f"/panel/{project_id}").status_code == 503
+    assert client.get(f"/api/kitchen/{project_id}/orders").status_code == 503
+    # guests are unaffected — the shop keeps selling
+    assert guest.get(f"/site/{project_id}").status_code == 200
+
+
+def test_unsigned_webhook_refused_when_stripe_is_live(project_id, monkeypatch):
+    """Without a signing secret the webhook is a free-food machine: forge a
+    'paid' event and the kitchen cooks it. Live keys must refuse unsigned."""
+    monkeypatch.setattr(stripe_pay, "DEMO_PAYMENTS", False)
+    monkeypatch.setattr(stripe_pay, "STRIPE_SECRET_KEY", "sk_live_x")
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "")
+    monkeypatch.setattr(stripe_pay, "create_checkout_session",
+                        lambda pid, oid, li, cur: f"https://stripe.test/{oid}")
+    order_id = order_id_of(checkout(project_id, mode="pickup"))
+    assert db.get_order(order_id)["status"] == "pending"
+
+    forged = {"type": "checkout.session.completed",
+              "data": {"object": {"metadata": {"order_id": order_id}}}}
+    r = guest.post("/api/stripe/webhook", content=json.dumps(forged))
+    assert r.status_code == 400
+    assert db.get_order(order_id)["status"] == "pending"  # still not paid

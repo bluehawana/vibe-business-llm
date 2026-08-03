@@ -1,18 +1,62 @@
 import json
 from pathlib import Path
+from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse,
+                               RedirectResponse, Response)
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from . import db, llm, receipt, stripe_pay
+from . import auth, db, llm, receipt, stripe_pay
 from .schema import DEFAULT_SPEC, find_menu_item
 
 app = FastAPI(title="Vibe Business")
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
 
 db.init_db()
+
+
+def require_staff(request: Request):
+    """Guards everything that isn't for guests. Public by design and deliberately
+    left open: the guest site, the success page, the printable slip (its order id
+    is unguessable), and the TV board, which shows nothing but order numbers and
+    has no keyboard to log in from."""
+    if not auth.configured():
+        raise HTTPException(503, "Set VIBE_STAFF_PASSWORD in .env to use the staff screens")
+    if auth.valid_session(request.cookies.get(auth.COOKIE)):
+        return
+    if request.url.path.startswith("/api/"):
+        raise HTTPException(401, "Staff login required")
+    raise HTTPException(307, "Staff login required",
+                        headers={"Location": f"/login?next={quote(request.url.path)}"})
+
+
+STAFF = [Depends(require_staff)]
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request, next: str = "/", bad: str = ""):
+    return templates.TemplateResponse(request, "login.html", {
+        "next": next, "bad": bool(bad), "configured": auth.configured(),
+    })
+
+
+@app.post("/login")
+def login(next: str = Form("/"), password: str = Form("")):
+    if not auth.check_password(password):
+        return RedirectResponse(f"/login?next={quote(next)}&bad=1", status_code=303)
+    response = RedirectResponse(next or "/", status_code=303)
+    response.set_cookie(auth.COOKIE, auth.session_token(), max_age=auth.COOKIE_MAX_AGE,
+                        httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(auth.COOKIE)
+    return response
 
 
 class CreateProject(BaseModel):
@@ -59,7 +103,7 @@ def landing(request: Request):
     return templates.TemplateResponse(request, "landing.html", {})
 
 
-@app.post("/api/projects")
+@app.post("/api/projects", dependencies=STAFF)
 def create_project(body: CreateProject):
     seed = (
         "Create the first version of my website. Here is my business:\n"
@@ -76,7 +120,7 @@ def create_project(body: CreateProject):
     return {"project_id": project_id, "reply": reply}
 
 
-@app.get("/builder/{project_id}", response_class=HTMLResponse)
+@app.get("/builder/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def builder(request: Request, project_id: str):
     project = _project_or_404(project_id)
     messages = db.get_messages(project_id)
@@ -86,7 +130,7 @@ def builder(request: Request, project_id: str):
     })
 
 
-@app.post("/api/projects/{project_id}/chat")
+@app.post("/api/projects/{project_id}/chat", dependencies=STAFF)
 def chat(project_id: str, body: ChatMessage):
     project = _project_or_404(project_id)
     history = db.get_messages(project_id)
@@ -245,7 +289,7 @@ async def stripe_webhook(request: Request):
 
 # ---------- Kitchen display (KDS) ----------
 
-@app.get("/kitchen/{project_id}", response_class=HTMLResponse)
+@app.get("/kitchen/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def kitchen(request: Request, project_id: str):
     project = _project_or_404(project_id)
     return templates.TemplateResponse(request, "kitchen.html", {
@@ -262,7 +306,7 @@ def _station_of(spec: dict) -> dict:
     return out
 
 
-@app.get("/counter/{project_id}", response_class=HTMLResponse)
+@app.get("/counter/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def counter(request: Request, project_id: str):
     """The Zettle hand-off screen: every order waiting to be charged, with the
     exact amount to key into the reader. Two taps, no till, and whoever is
@@ -271,7 +315,7 @@ def counter(request: Request, project_id: str):
     return templates.TemplateResponse(request, "counter.html", {"project": project})
 
 
-@app.get("/pass/{project_id}", response_class=HTMLResponse)
+@app.get("/pass/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def pass_screen(request: Request, project_id: str):
     """Reception iPad. No till any more, but somebody still has to carry plates
     to the right table and put the right food in the right bag — this screen
@@ -280,13 +324,13 @@ def pass_screen(request: Request, project_id: str):
     return templates.TemplateResponse(request, "pass.html", {"project": project})
 
 
-@app.get("/api/counter/{project_id}/unsettled")
+@app.get("/api/counter/{project_id}/unsettled", dependencies=STAFF)
 def counter_unsettled(project_id: str):
     _project_or_404(project_id)
     return {"orders": db.get_unsettled_orders(project_id)}
 
 
-@app.get("/api/kitchen/{project_id}/orders")
+@app.get("/api/kitchen/{project_id}/orders", dependencies=STAFF)
 def kitchen_orders(project_id: str, station: str = ""):
     project = _project_or_404(project_id)
     orders = db.get_active_orders(project_id)
@@ -314,7 +358,7 @@ def display(request: Request, project_id: str):
     return templates.TemplateResponse(request, "display.html", {"project": project})
 
 
-@app.post("/api/kitchen/{project_id}/orders/{order_id}/status")
+@app.post("/api/kitchen/{project_id}/orders/{order_id}/status", dependencies=STAFF)
 def kitchen_status(project_id: str, order_id: str, body: FulfillmentUpdate):
     _project_or_404(project_id)
     order = db.get_order(order_id)
@@ -329,7 +373,7 @@ def kitchen_status(project_id: str, order_id: str, body: FulfillmentUpdate):
 
 # ---------- Restaurant control panel (the operational hub) ----------
 
-@app.get("/panel/{project_id}", response_class=HTMLResponse)
+@app.get("/panel/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def panel(request: Request, project_id: str):
     project = _project_or_404(project_id)
     stations = sorted({it.get("station", "kitchen")
@@ -338,12 +382,13 @@ def panel(request: Request, project_id: str):
     return templates.TemplateResponse(request, "panel.html", {
         "project": project,
         "stations": stations or ["kitchen"],
+        "printer_key": auth.printer_key(),
     })
 
 
 # ---------- In-store iPad kiosk ----------
 
-@app.get("/kiosk/{project_id}", response_class=HTMLResponse)
+@app.get("/kiosk/{project_id}", response_class=HTMLResponse, dependencies=STAFF)
 def kiosk(request: Request, project_id: str):
     """Reception iPad in self-hosting mode: the guest orders and pays themselves,
     eat-here or takeaway, and walks away with a number. Same ordering UI as the
@@ -363,7 +408,20 @@ def kiosk(request: Request, project_id: str):
 # paid order is waiting, we tell it a job is ready; it GETs the ticket text and
 # DELETEs to confirm. No local driver, no printer IP — cloud-native printing.
 
-@app.post("/api/cloudprnt/{project_id}")
+def require_printer(key: str = ""):
+    """The printer polls a fixed URL and can't hold a cookie, so it carries its
+    own key (shown on the control panel). Without it these endpoints would leak
+    every order's contents to anyone who found the URL."""
+    if not auth.configured():
+        raise HTTPException(503, "Set VIBE_STAFF_PASSWORD in .env before printing")
+    if not auth.valid_printer_key(key):
+        raise HTTPException(401, "Bad printer key")
+
+
+PRINTER = [Depends(require_printer)]
+
+
+@app.post("/api/cloudprnt/{project_id}", dependencies=PRINTER)
 async def cloudprnt_poll(project_id: str):
     _project_or_404(project_id)
     order = db.get_next_unprinted_order(project_id)
@@ -372,7 +430,7 @@ async def cloudprnt_poll(project_id: str):
             "jobToken": order["id"] if order else ""}
 
 
-@app.get("/api/cloudprnt/{project_id}", response_class=PlainTextResponse)
+@app.get("/api/cloudprnt/{project_id}", response_class=PlainTextResponse, dependencies=PRINTER)
 def cloudprnt_job(project_id: str, role: str = "both"):
     """One printer at the reception iPad prints both documents per order: the
     guest's number slip (they carry it to their table) and the kitchen ticket.
@@ -394,7 +452,7 @@ def cloudprnt_job(project_id: str, role: str = "both"):
     return PlainTextResponse("".join(docs), media_type="text/plain; charset=utf-8")
 
 
-@app.delete("/api/cloudprnt/{project_id}")
+@app.delete("/api/cloudprnt/{project_id}", dependencies=PRINTER)
 async def cloudprnt_confirm(project_id: str, token: str = ""):
     _project_or_404(project_id)
     order = db.get_next_unprinted_order(project_id) if not token else db.get_order(token)
@@ -422,7 +480,7 @@ def receipt_page(request: Request, order_id: str):
 
 # ---------- Owner admin ----------
 
-@app.get("/admin/{project_id}/orders", response_class=HTMLResponse)
+@app.get("/admin/{project_id}/orders", response_class=HTMLResponse, dependencies=STAFF)
 def orders(request: Request, project_id: str):
     project = _project_or_404(project_id)
     return templates.TemplateResponse(request, "orders.html", {
@@ -432,7 +490,7 @@ def orders(request: Request, project_id: str):
     })
 
 
-@app.post("/api/admin/{project_id}/orders/{order_id}/settle")
+@app.post("/api/admin/{project_id}/orders/{order_id}/settle", dependencies=STAFF)
 def settle_order(project_id: str, order_id: str):
     """The order was charged on the Zettle reader → mark it paid here. Zettle is
     the certified register that records the sale; we only mirror the outcome so
@@ -445,7 +503,7 @@ def settle_order(project_id: str, order_id: str):
     return {"ok": True}
 
 
-@app.get("/admin/{project_id}/customers", response_class=HTMLResponse)
+@app.get("/admin/{project_id}/customers", response_class=HTMLResponse, dependencies=STAFF)
 def customers(request: Request, project_id: str):
     project = _project_or_404(project_id)
     return templates.TemplateResponse(request, "customers.html", {

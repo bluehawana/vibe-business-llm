@@ -30,6 +30,13 @@
   <div class="host">
     On the iPads and Apple TV: replace <code>this address</code> with the Mac mini's address on the
     network, e.g. <code>http://192.168.1.50:8100</code>. Start the server with <code>./run.sh</code>.
+    Each staff iPad logs in once with the staff password and stays logged in.
+    <a href="/logout" style="color:#8a3a14">Log out of this device</a>.
+  </div>
+  <div class="host" style="background:#eef3ec;border-color:#c8d8c4">
+    <b>Printer key</b> — the printer can't log in, so its polling URL carries its own key.
+    Rotating the staff password rotates this too.<br>
+    <code style="user-select:all">/api/cloudprnt/{{ project.id }}?key={{ printer_key }}</code>
   </div>
 
   <div class="grid">

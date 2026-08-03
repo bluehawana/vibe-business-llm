@@ -139,12 +139,28 @@ cloudflared tunnel run --url http://localhost:8100 ichiban
 
 Gives HTTPS on `order.ichiban.biz` with no port forwarding and no static IP.
 
-> 🔴 **Do this before the tunnel goes public.** `/panel`, `/admin`, `/kitchen`,
-> `/counter` and `/pass` have **no authentication today**. On the restaurant LAN
-> that's tolerable; on a public URL anyone could read your orders and mark them
-> paid. Either restrict the tunnel to `/site`, `/api/site`, `/api/stripe` and
-> `/receipt`, or put Cloudflare Access in front of the staff paths. Say the word
-> and I'll add a proper staff login instead.
+Staff screens are behind a login, so the tunnel can expose everything safely.
+
+## 6b. Staff login
+
+One shared password per installation — `VIBE_STAFF_PASSWORD` in `.env`. `run.sh`
+generates one on first start and prints it; each staff iPad logs in once and
+stays logged in for 180 days. Changing the password logs every device out.
+
+| Behind the login | Open to guests |
+|---|---|
+| `/panel` `/builder` `/kiosk` | `/site` and `/api/site/…/checkout` |
+| `/kitchen` `/counter` `/pass` | `/site/…/success` |
+| `/admin/…` and their APIs | `/receipt/<order-id>` (unguessable id) |
+| | `/display` — the TV has no keyboard, and shows only numbers |
+
+**With no password set the staff screens return 503** rather than serving. They
+fail closed on purpose: "I'll set it later" is how a kitchen display ends up on
+the open internet.
+
+The thermal printer can't fill in a login form, so it gets its own key derived
+from the same password. The exact URL is shown on `/panel` — rotating the
+password rotates the printer key too.
 
 ## 7. Assign the devices
 

@@ -10,7 +10,11 @@ from pathlib import Path
 
 # Redirect the DB before app.main is imported anywhere: app.main calls
 # db.init_db() at import time.
-from app import db
+from app import auth, db
 
 _tmp = tempfile.TemporaryDirectory()
 db.DB_PATH = Path(_tmp.name) / "test.db"
+
+# Staff screens fail closed without a password, so tests need one set. Anything
+# that must work for a guest is verified without logging in.
+auth.STAFF_PASSWORD = "test-staff-pw"
