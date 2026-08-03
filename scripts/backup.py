@@ -11,7 +11,11 @@ import sqlite3
 import time
 from pathlib import Path
 
-SRC = Path.home() / "vibe-business-llm" / "data" / "vibe.db"
+# Relative to this file, not to $HOME — the repo sits at ~/vibe-business-llm on
+# the server and ~/Projects/vibe-business-llm on the Mac, and a backup script
+# that only works in one of them is a backup script that fails when you need it.
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "data" / "vibe.db"
 DEST = Path.home() / "backups" / "vibe"
 KEEP_HOURLY = 48          # two days of hourly snapshots
 KEEP_DAILY = 30           # a month of dailies
