@@ -14,6 +14,7 @@
 <meta property="og:type" content="restaurant.restaurant">
 {% if page_url %}<meta property="og:url" content="{{ page_url }}">{% endif %}
 {% if spec.hero.get('image') %}<meta property="og:image" content="{{ spec.hero.image }}">{% endif %}
+{% if spec.get('logo') %}<link rel="icon" href="{{ spec.logo }}">{% endif %}
 <style>
   :root {
     --primary: {{ spec.theme.primary_color }};
@@ -32,6 +33,7 @@
   .announce { background: var(--accent); color: #fff; text-align: center; padding: 8px 16px; font-size: .92rem; }
   nav { display: flex; align-items: center; padding: 16px 0; gap: 16px; }
   nav .logo { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+  nav .logoimg { height: 46px; width: auto; }
   nav .cartbtn { margin-left: auto; background: var(--primary); color: #fff; border: 0; padding: 9px 18px;
       border-radius: 999px; cursor: pointer; font-size: .95rem; }
   .hero { text-align: center; padding: 56px 16px 46px; }
@@ -188,7 +190,8 @@
 
 <div class="wrap">
   <nav>
-    <span class="logo">{{ spec.business_name }}</span>
+    {% if spec.get('logo') %}<img class="logoimg" src="{{ spec.logo }}" alt="{{ spec.business_name }}">
+    {% else %}<span class="logo">{{ spec.business_name }}</span>{% endif %}
     <button class="modechip" id="modechip" hidden></button>
     <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span></button>
   </nav>

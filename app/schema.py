@@ -17,6 +17,8 @@ def _obj(props: dict) -> dict:
 
 SITE_SCHEMA = _obj({
     "business_name": {"type": "string"},
+    "logo": {"type": "string",
+             "description": "Logo image URL shown in the nav and as favicon, or empty string"},
     "tagline": {"type": "string"},
     "about": {"type": "string", "description": "1-2 warm paragraphs about the business"},
     "language": {"type": "string", "description": "Site language code, e.g. 'sv' or 'en'"},
@@ -115,6 +117,7 @@ RESPONSE_SCHEMA = _obj({
 
 DEFAULT_SPEC = {
     "business_name": "My Restaurant",
+    "logo": "",
     "tagline": "Good food, made with care",
     "about": "",
     "language": "en",
