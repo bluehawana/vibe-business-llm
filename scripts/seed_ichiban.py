@@ -157,7 +157,7 @@ SPEC = {
         {"days": "Sun", "open": "15:00", "close": "21:00"},
     ],
     "contact": {"address": "Södra Vägen 91, 412 63 Göteborg",
-                "phone": "031-83 17 86", "email": "info@ichiban.biz",
+                "phone": "+46 31-83 17 86", "email": "info@ichiban.biz",
                 "facebook": "https://www.facebook.com/ichibangbg/", "instagram": ""},
     "announcements": [],
 }
