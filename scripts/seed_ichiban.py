@@ -136,7 +136,7 @@ SPEC = {
         "font": "sans",
     },
     "hero": {"headline": "Ichiban Sushi", "subheadline": "Handmade sushi \u2014 eat in or take away",
-             "emoji": "🍣", "image": "/static/ichiban/hero.jpg?v=2"},
+             "emoji": "🍣", "image": "/static/ichiban/hero-nigiri.jpg"},
     "menu": MENU,
     "seo": {
         "title": "Ichiban Sushi Göteborg — Fresh Handmade Sushi & Poké Bowls",
