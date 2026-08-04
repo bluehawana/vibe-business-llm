@@ -6,6 +6,7 @@ Categories here are the "folders" the kiosk drills into, and the order they
 appear in is the order guests see them, so the sellers come first.
 """
 
+import pathlib
 import sys
 
 from app import db
@@ -156,8 +157,22 @@ SPEC = {
 }
 
 
+def _attach_photos(menu):
+    """Yan's photos, paired from ichiban.biz/meny, self-hosted in /static."""
+    import json
+    photo_file = pathlib.Path(__file__).parent / "ichiban_photos.json"
+    if not photo_file.exists():
+        return
+    photos = json.loads(photo_file.read_text())
+    for cat in menu:
+        for it in cat["items"]:
+            if it["id"] in photos:
+                it["image"] = photos[it["id"]]
+
+
 def main():
     db.init_db()
+    _attach_photos(SPEC["menu"])
     existing = [p for p in _all_projects() if p["name"] == "Ichiban Sushi"]
     if existing:
         pid = existing[0]["id"]
