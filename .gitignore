@@ -11,3 +11,4 @@ venv/
 apps/*.xcodeproj/
 apps/build/
 DerivedData/
+app/static/ichiban/library/
