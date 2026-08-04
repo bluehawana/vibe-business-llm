@@ -879,3 +879,41 @@ def test_purchase_older_than_order_never_matches(project_id, monkeypatch):
                         lambda: [_purchase("zp-4", 154700, stale)])
     assert zettle_pay.auto_settle(db) == 0
     assert db.get_order(oid)["status"] == "unpaid"
+
+
+# ---------- Stripe Terminal / Tap to Pay server side ----------
+
+def test_terminal_endpoints_are_staff_only(project_id):
+    assert guest.post("/api/terminal/connection_token").status_code == 401
+    assert guest.post(f"/api/terminal/orders/x/payment_intent").status_code == 401
+
+
+def test_terminal_payment_intent_uses_server_amount(project_id, monkeypatch):
+    captured = {}
+    def fake_pi(order_id, amount_minor, currency):
+        captured.update(order_id=order_id, amount_minor=amount_minor, currency=currency)
+        return {"id": "pi_test", "client_secret": "pi_test_secret"}
+    monkeypatch.setattr(stripe_pay, "stripe_enabled", lambda: True)
+    monkeypatch.setattr(stripe_pay, "create_order_payment_intent", fake_pi)
+    oid = order_id_of(checkout(project_id, payment="in_store", kiosk=True))  # 238 SEK
+    r = client.post(f"/api/terminal/orders/{oid}/payment_intent")
+    assert r.status_code == 200 and r.json()["id"] == "pi_test"
+    assert captured["amount_minor"] == 23800 and captured["currency"] == "SEK"
+
+
+def test_terminal_refuses_already_paid_orders(project_id, monkeypatch):
+    oid = order_id_of(checkout(project_id, payment="online"))  # demo -> paid
+    monkeypatch.setattr(stripe_pay, "stripe_enabled", lambda: True)  # after checkout
+    assert client.post(f"/api/terminal/orders/{oid}/payment_intent").status_code == 400
+
+
+def test_payment_intent_webhook_settles_order(project_id, monkeypatch):
+    """Tap to Pay confirms via payment_intent.succeeded, not checkout.session."""
+    monkeypatch.setattr(stripe_pay, "STRIPE_WEBHOOK_SECRET", "whsec_tap")
+    oid = order_id_of(checkout(project_id, payment="in_store", kiosk=True))
+    payload = json.dumps({"object": "event", "type": "payment_intent.succeeded",
+                          "data": {"object": {"metadata": {"order_id": oid}}}})
+    r = guest.post("/api/stripe/webhook", content=payload,
+                   headers=signed_webhook(payload, "whsec_tap"))
+    assert r.status_code == 200
+    assert db.get_order(oid)["status"] == "paid"

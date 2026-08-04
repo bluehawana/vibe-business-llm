@@ -332,6 +332,30 @@ async def stripe_webhook(request: Request):
     return {"ok": True}
 
 
+# ---------- Stripe Terminal / Tap to Pay (in-person, via the app) ----------
+
+@app.post("/api/terminal/connection_token", dependencies=STAFF)
+def terminal_connection_token():
+    if not stripe_pay.stripe_enabled():
+        raise HTTPException(503, "Stripe is not configured")
+    return {"secret": stripe_pay.create_terminal_connection_token()}
+
+
+@app.post("/api/terminal/orders/{order_id}/payment_intent", dependencies=STAFF)
+def terminal_payment_intent(order_id: str):
+    """Amount comes from the order on the server — the device never decides
+    what to charge, exactly like the Zettle bridge."""
+    if not stripe_pay.stripe_enabled():
+        raise HTTPException(503, "Stripe is not configured")
+    order = db.get_order(order_id)
+    if order is None:
+        raise HTTPException(404, "Order not found")
+    if order["status"] == "paid":
+        raise HTTPException(400, "Order is already paid")
+    return stripe_pay.create_order_payment_intent(
+        order_id, int(round(order["total"] * 100)), order["currency"])
+
+
 # ---------- Kitchen display (KDS) ----------
 
 @app.get("/kitchen/{project_id}", response_class=HTMLResponse, dependencies=STAFF)

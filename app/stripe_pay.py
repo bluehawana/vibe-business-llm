@@ -59,6 +59,25 @@ def create_checkout_session(project_id: str, order_id: str, line_items: list[dic
     return session.url
 
 
+def create_terminal_connection_token() -> str:
+    """Stripe Terminal (incl. Tap to Pay on iPhone): the app fetches one of
+    these from us at startup; it scopes the device to our account."""
+    return stripe.terminal.ConnectionToken.create().to_dict()["secret"]
+
+
+def create_order_payment_intent(order_id: str, amount_minor: int, currency: str) -> dict:
+    """A PaymentIntent for an in-person tap, carrying the order id the same way
+    Checkout sessions do, so one webhook path settles both."""
+    pi = stripe.PaymentIntent.create(
+        amount=amount_minor,
+        currency=currency.lower(),
+        payment_method_types=["card_present"],
+        capture_method="automatic",
+        metadata={"order_id": order_id},
+    ).to_dict()
+    return {"id": pi["id"], "client_secret": pi["client_secret"]}
+
+
 def parse_webhook(payload: bytes, sig_header: str):
     """Returns the order_id of a completed checkout, or None.
 
@@ -86,6 +105,8 @@ def parse_webhook(payload: bytes, sig_header: str):
             "STRIPE_WEBHOOK_SECRET is not set — refusing to trust an unsigned webhook")
 
     event = json.loads(payload)
-    if event.get("type") != "checkout.session.completed":
+    # Two ways money arrives: hosted Checkout (online) and PaymentIntents
+    # (Terminal / Tap to Pay). Both carry our order id in metadata.
+    if event.get("type") not in ("checkout.session.completed", "payment_intent.succeeded"):
         return None
     return event.get("data", {}).get("object", {}).get("metadata", {}).get("order_id")
