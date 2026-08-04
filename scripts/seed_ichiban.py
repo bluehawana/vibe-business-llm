@@ -124,12 +124,13 @@ SPEC = {
              "when your food is ready.",
     "language": "en",
     "currency": SEK,
-    # Matched to www.ichiban.biz: light, minimal, sans-serif, photo-forward.
+    # The brand triad from www.ichiban.biz and the logo: white ground, black
+    # type and structure, dark red strictly as accent — not red everywhere.
     "theme": {
-        "primary_color": "#b0191e",
-        "accent_color": "#d0342c",
-        "background_color": "#fbfbf9",
-        "text_color": "#1e1e1e",
+        "primary_color": "#161616",
+        "accent_color": "#a6131c",
+        "background_color": "#ffffff",
+        "text_color": "#1d1d1d",
         "font": "sans",
     },
     "hero": {"headline": "Ichiban Sushi", "subheadline": "Handmade sushi \u2014 eat in or take away",
