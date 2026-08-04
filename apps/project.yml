@@ -1,4 +1,8 @@
 name: Ichiban
+packages:
+  ZettleSDK:
+    url: https://github.com/iZettle/sdk-ios
+    exactVersion: 4.70.3
 options:
   bundleIdPrefix: se.ichiban
   deploymentTarget:
@@ -40,6 +44,9 @@ targets:
     type: application
     platform: iOS
     sources: [Screens, Shared]
+    dependencies:
+      - package: ZettleSDK
+        product: sdk-ios
     info:
       path: Screens/Info.plist
       properties:

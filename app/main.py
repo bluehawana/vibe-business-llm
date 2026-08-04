@@ -9,7 +9,7 @@ from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse,
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from . import auth, db, llm, receipt, stripe_pay
+from . import auth, db, llm, receipt, stripe_pay, zettle_pay
 from .schema import DEFAULT_SPEC, find_menu_item
 
 app = FastAPI(title="Vibe Business")
@@ -20,6 +20,28 @@ templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templat
 HOME_PROJECT = os.environ.get("VIBE_HOME_PROJECT", "")
 
 db.init_db()
+
+
+@app.on_event("startup")
+async def start_zettle_poller():
+    """Watches the Zettle Purchase API and settles counter orders the moment the
+    reader takes the money — the 'Paid on Zettle' tap, automated. Off unless
+    ZETTLE_CLIENT_ID / ZETTLE_API_KEY are configured."""
+    if not zettle_pay.enabled():
+        return
+    import asyncio
+
+    async def loop():
+        while True:
+            try:
+                n = await asyncio.to_thread(zettle_pay.auto_settle, db)
+                if n:
+                    print(f"zettle auto-settle: {n} order(s)")
+            except Exception as e:  # a Zettle outage must never take us down
+                print(f"zettle auto-settle error: {type(e).__name__}: {e}")
+            await asyncio.sleep(30)
+
+    asyncio.create_task(loop())
 
 
 def require_staff(request: Request):

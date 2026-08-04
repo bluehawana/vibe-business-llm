@@ -57,6 +57,9 @@ def init_db():
             "ALTER TABLE orders ADD COLUMN serve_now INTEGER NOT NULL DEFAULT 0",
             # paid_via: 'stripe' | 'zettle' — which register the money went through.
             "ALTER TABLE orders ADD COLUMN paid_via TEXT NOT NULL DEFAULT ''",
+            # zettle_purchase_uuid: which reader purchase auto-settled this order,
+            # so one purchase can never pay for two orders.
+            "ALTER TABLE orders ADD COLUMN zettle_purchase_uuid TEXT",
         ]:
             try:
                 conn.execute(ddl)
@@ -200,6 +203,31 @@ def get_unsettled_orders(project_id: str) -> list[dict]:
             (project_id,),
         ).fetchall()
     return [_order_dict(r) for r in rows]
+
+
+def get_unsettled_orders_all() -> list[dict]:
+    """Unpaid orders across every project — the reader poller matches globally,
+    because one Zettle account serves the whole install."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM orders WHERE status = 'unpaid' ORDER BY created_at").fetchall()
+    return [_order_dict(r) for r in rows]
+
+
+def get_used_zettle_purchase_uuids() -> set[str]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT zettle_purchase_uuid FROM orders WHERE zettle_purchase_uuid IS NOT NULL"
+        ).fetchall()
+    return {r[0] for r in rows}
+
+
+def settle_order_from_zettle(order_id: str, purchase_uuid: str):
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE orders SET status = 'paid', paid_via = 'zettle',"
+            " zettle_purchase_uuid = ? WHERE id = ? AND status = 'unpaid'",
+            (purchase_uuid, order_id))
 
 
 def get_next_unprinted_order(project_id: str):

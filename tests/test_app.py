@@ -823,3 +823,59 @@ def test_no_photos_means_no_broken_images(project_id):
     """A spec without photos must render exactly zero <img> tags."""
     html = guest.get(f"/site/{project_id}").text
     assert '<img' not in html
+
+
+# ---------- Zettle auto-settle (the counter tap, automated) ----------
+
+def _purchase(uuid, amount_minor, ts, currency="SEK"):
+    return {"uuid": uuid, "amount_minor": amount_minor, "currency": currency, "ts": ts}
+
+
+def test_reader_purchase_settles_matching_order(project_id, monkeypatch):
+    import time as _t
+    from app import zettle_pay
+    # unique amount (7 x 119 = 833) so unpaid orders left by other tests can't match
+    oid = order_id_of(checkout(project_id, payment="in_store", kiosk=True,
+                               items=[{"id": "margherita", "qty": 7}]))
+    monkeypatch.setattr(zettle_pay, "recent_purchases",
+                        lambda: [_purchase("zp-1", 83300, _t.time())])
+    assert zettle_pay.auto_settle(db) == 1
+    o = db.get_order(oid)
+    assert o["status"] == "paid" and o["paid_via"] == "zettle"
+
+
+def test_wrong_amount_never_matches(project_id, monkeypatch):
+    import time as _t
+    from app import zettle_pay
+    oid = order_id_of(checkout(project_id, payment="in_store", kiosk=True,
+                               items=[{"id": "margherita", "qty": 9}]))  # 1071
+    monkeypatch.setattr(zettle_pay, "recent_purchases",
+                        lambda: [_purchase("zp-2", 107000, _t.time())])  # 1 kr off
+    assert zettle_pay.auto_settle(db) == 0
+    assert db.get_order(oid)["status"] == "unpaid"
+
+
+def test_one_purchase_cannot_pay_two_orders(project_id, monkeypatch):
+    import time as _t
+    from app import zettle_pay
+    a = order_id_of(checkout(project_id, payment="in_store", kiosk=True,
+                             items=[{"id": "margherita", "qty": 11}]))  # 1309
+    b = order_id_of(checkout(project_id, payment="in_store", kiosk=True,
+                             items=[{"id": "margherita", "qty": 11}]))
+    monkeypatch.setattr(zettle_pay, "recent_purchases",
+                        lambda: [_purchase("zp-3", 130900, _t.time())])
+    assert zettle_pay.auto_settle(db) == 1
+    assert db.get_order(a)["status"] == "paid"      # oldest claims the purchase
+    assert db.get_order(b)["status"] == "unpaid"    # stays for a human
+
+
+def test_purchase_older_than_order_never_matches(project_id, monkeypatch):
+    import time as _t
+    from app import zettle_pay
+    oid = order_id_of(checkout(project_id, payment="in_store", kiosk=True,
+                               items=[{"id": "margherita", "qty": 13}]))  # 1547
+    stale = _t.time() - 900  # a sale from before this order existed
+    monkeypatch.setattr(zettle_pay, "recent_purchases",
+                        lambda: [_purchase("zp-4", 154700, stale)])
+    assert zettle_pay.auto_settle(db) == 0
+    assert db.get_order(oid)["status"] == "unpaid"
