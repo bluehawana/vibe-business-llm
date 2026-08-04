@@ -34,7 +34,6 @@
     --card: #171717;
     --line: rgba(255,255,255,.14);
   }
-  html.dark .cartbar { background: var(--accent); }
   html.dark .pills button.on { background: #f5f4f1; border-color: #f5f4f1; color: #111; }
   * { box-sizing: border-box; margin: 0; }
   body {
@@ -160,15 +159,6 @@
       border-radius: 16px 16px 0 0; aspect-ratio: 16 / 7; }
   .item .instore { align-self: flex-start; }
   /* Bottom cart bar — the one loud CTA, always within thumb's reach */
-  .cartbar { position: fixed; right: 16px; bottom: 16px; z-index: 40;
-      display: flex; align-items: center; gap: 10px; background: var(--primary); color: #fff;
-      border: 0; border-radius: 999px; padding: 13px 20px; font-family: inherit;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
-      box-shadow: 0 6px 20px rgba(0,0,0,.3); }
-  .cartbar .count { background: rgba(255,255,255,.25); border-radius: 999px; min-width: 28px;
-      height: 28px; display: grid; place-items: center; font-size: .95rem; }
-  .cartbar .lbl { flex: 1; text-align: left; }
-  body { padding-bottom: 24px; }
   /* Photos */  /* Photos */
   .hero.photo { background-size: cover; background-position: center; border-radius: 18px;
       margin-top: 6px; }
@@ -208,7 +198,7 @@
     {% else %}<span class="logo">{{ spec.business_name }}</span>{% endif %}
     <button class="modechip" id="modechip" hidden></button>
     <button class="modechip" id="darkbtn" aria-label="Dark mode">🌙</button>
-    <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span></button>
+    <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span><span id="cartbtntotal"></span></button>
   </nav>
 
   <div class="hero{% if spec.hero.get('image') %} photo{% endif %}"{% if spec.hero.get('image') %} style="background-image:linear-gradient(rgba(22,17,12,.42),rgba(22,17,12,.55)),url('{{ spec.hero.image }}')"{% endif %}>
@@ -292,11 +282,6 @@
 
   <footer>{{ spec.get('copyright') or spec.business_name }}</footer>
 </div>
-
-<button class="cartbar" id="cartbar" hidden>
-  <span class="count" id="cbcount">0</span>
-  <span class="tot" id="cbtotal"></span>
-</button>
 
 <div class="drawer" id="drawer">
   <h2>{% if spec.language == 'sv' %}Din beställning{% else %}Your order{% endif %}
@@ -466,8 +451,6 @@ const spy = new IntersectionObserver(entries => {
 }, { rootMargin: '-15% 0px -70% 0px' });
 for (const c of document.querySelectorAll('.category')) spy.observe(c);
 
-document.getElementById('cartbar').onclick = () => drawer.classList.add('open');
-
 function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); }
 function bump(id, d) { cart[id] = (cart[id] || 0) + d; if (cart[id] <= 0) delete cart[id]; renderCart(); }
 
@@ -483,9 +466,6 @@ function renderCart() {
   const ids = Object.keys(cart);
   const n = ids.reduce((s, i) => s + cart[i], 0);
   document.getElementById('cartcount').textContent = n;
-  const bar = document.getElementById('cartbar');
-  bar.hidden = !ids.length || drawer.classList.contains('open');
-  document.getElementById('cbcount').textContent = n;
   box.innerHTML = ids.length
     ? ids.map(id => {
         const it = ITEMS[id];
@@ -497,7 +477,8 @@ function renderCart() {
     : '<p class="empty">{% if spec.language == "sv" %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p>';
   const total = cartTotal();
   document.getElementById('carttotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
-  document.getElementById('cbtotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
+  document.getElementById('cartbtntotal').textContent =
+      ids.length ? ' · ' + total.toFixed(0) + ' ' + SPEC.currency : '';
 
   // The button says exactly what happens next, so nobody taps "Pay" expecting
   // a card form and lands on "go to the counter" instead.
