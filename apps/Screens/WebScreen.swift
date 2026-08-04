@@ -16,6 +16,8 @@ struct WebScreen: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        // The kiosk page posts card-payment requests here; see ZettleReader.swift.
+        config.userContentController.add(context.coordinator, name: "zettle")
         let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = context.coordinator
         view.scrollView.bounces = false
@@ -38,7 +40,22 @@ struct WebScreen: UIViewRepresentable {
 
     func updateUIView(_ view: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        func userContentController(_ controller: WKUserContentController,
+                                   didReceive message: WKScriptMessage) {
+            guard message.name == "zettle",
+                  let body = message.body as? [String: Any],
+                  let orderId = body["orderId"] as? String,
+                  let amount = body["amountMinor"] as? Int,
+                  let currency = body["currency"] as? String else { return }
+            CardReader.driver.charge(amountMinor: amount, currency: currency,
+                                     reference: orderId) { [weak self] ok in
+                DispatchQueue.main.async {
+                    self?.view?.evaluateJavaScript("window.zettleResult(\(ok))")
+                }
+            }
+        }
+
         private let onExit: () -> Void
         private weak var view: WKWebView?
 

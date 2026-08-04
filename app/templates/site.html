@@ -115,22 +115,45 @@
   .modechip b { color: var(--primary); }
   .cancelbtn { background: none; border: 0; color: var(--text); opacity: .5; cursor: pointer;
       font-family: inherit; font-size: .85rem; }
-  /* Category folders */
-  .folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;
-      margin-top: 18px; }
-  .folder { position: relative; aspect-ratio: 4 / 3; border: 0; border-radius: 14px; cursor: pointer;
-      font-family: inherit; overflow: hidden; padding: 18px; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 4px; text-align: center;
-      background: var(--primary) center/cover no-repeat; color: #fff; }
-  /* Scrim so the title stays legible once a real photo sits behind it. */
-  .folder::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.34); }
-  .folder > * { position: relative; z-index: 1; }
-  .folder .ftitle { font-size: 1.45rem; font-weight: 800; line-height: 1.15;
-      text-shadow: 0 2px 10px rgba(0,0,0,.5); }
-  .folder .fcount { font-size: .8rem; opacity: .85; }
-  .backbtn { background: none; border: 0; color: var(--primary); font-family: inherit;
-      font-size: .95rem; cursor: pointer; padding: 12px 0; }
-  /* Photos */
+  /* Menu: sticky pills + full cards (the Benne pattern) */
+  .pills { position: sticky; top: 0; z-index: 30; display: flex; gap: 8px; overflow-x: auto;
+      padding: 12px 0; margin: 6px -20px 0; padding-left: 20px; padding-right: 20px;
+      background: var(--bg); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pills button { flex: 0 0 auto; border: 1.5px solid rgba(0,0,0,.14); background: #fff;
+      color: inherit; font-family: inherit; font-size: .92rem; padding: 9px 18px;
+      border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .pills button.on { background: var(--primary); border-color: var(--primary); color: #fff;
+      font-weight: 600; }
+  .category { margin-top: 34px; scroll-margin-top: 70px; }
+  .category h3 { font-size: 1.35rem; text-transform: uppercase; letter-spacing: .06em;
+      border: 0; margin-bottom: 16px; }
+  .items { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 640px) { .items { grid-template-columns: 1fr 1fr; } }
+  .item { position: relative; background: #fff; border: 1px solid rgba(0,0,0,.07);
+      border-radius: 16px; padding: 18px; padding-right: 64px; display: flex;
+      flex-direction: column; gap: 8px; }
+  .item .name { font-weight: 700; font-size: 1.02rem; }
+  .item .desc { margin-top: 2px; }
+  .item .add { position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--accent);
+      color: #fff; font-size: 1.5rem; line-height: 1; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+  .item .add:active { transform: translateY(-50%) scale(.92); }
+  .item .photo { margin: -18px 46px 4px -18px; width: calc(100% + 36px); max-width: none;
+      border-radius: 16px 16px 0 0; aspect-ratio: 16 / 7; }
+  .item .instore { align-self: flex-start; }
+  /* Bottom cart bar — the one loud CTA, always within thumb's reach */
+  .cartbar { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 40;
+      display: flex; align-items: center; gap: 12px; background: var(--primary); color: #fff;
+      border: 0; border-radius: 999px; padding: 16px 22px; font-family: inherit;
+      font-size: 1.05rem; font-weight: 600; cursor: pointer;
+      box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+  .cartbar .count { background: rgba(255,255,255,.25); border-radius: 999px; min-width: 28px;
+      height: 28px; display: grid; place-items: center; font-size: .95rem; }
+  .cartbar .lbl { flex: 1; text-align: left; }
+  body { padding-bottom: 84px; }
+  /* Photos */  /* Photos */
   .hero.photo { background-size: cover; background-position: center; border-radius: 18px;
       margin-top: 6px; }
   .hero.photo h1, .hero.photo p { color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.45); }
@@ -190,33 +213,30 @@
 
   <section id="menu">
     <h2 id="menuhead">{% if spec.language == 'sv' %}Meny{% else %}Menu{% endif %}</h2>
-    <!-- Folders first: a wall of 60 dishes is unusable on a counter iPad, so the
-         menu opens as one tile per category and drills in on tap. -->
-    <div class="folders" id="folders">
+    <!-- Benne-style: every dish stays on the page; the pills are a map, not doors.
+         Nothing hides behind a tap, and the bar stays put while you scroll. -->
+    <nav class="pills" id="pills">
       {% for cat in spec.menu %}
-      <button type="button" class="folder" data-cat="{{ loop.index0 }}"
-              {% if cat.get('image') %}style="background-image:url('{{ cat.image }}')"{% endif %}>
-        <span class="ftitle">{{ cat.category }}</span>
-        <span class="fcount">{{ cat['items'] | length }} {% if spec.language == 'sv' %}rätter{% else %}items{% endif %}</span>
-      </button>
+      <button type="button" data-target="cat{{ loop.index0 }}"{% if loop.first %} class="on"{% endif %}>{{ cat.category }}</button>
       {% endfor %}
-    </div>
-    <button type="button" class="backbtn" id="backbtn" hidden>← {% if spec.language == 'sv' %}Alla kategorier{% else %}All categories{% endif %}</button>
+    </nav>
     {% for cat in spec.menu %}
-    <div class="category" data-cat="{{ loop.index0 }}" hidden>
+    <div class="category" id="cat{{ loop.index0 }}">
       <h3>{{ cat.category }}</h3>
       <div class="items">
         {% for it in cat['items'] %}
         <div class="item">
           {% if it.get('image') %}<img class="photo" src="{{ it.image }}" alt="{{ it.name }}" loading="lazy">{% endif %}
-          <div class="top"><span class="name">{{ it.name }}</span>
-            <span class="price">{{ '%g' % it.price }} {{ spec.currency }}</span></div>
-          <p class="desc">{{ it.description }}</p>
-          {% if it.tags %}<div class="tags">{% for t in it.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>{% endif %}
+          <div class="body">
+            <div class="top"><span class="name">{{ it.name }}</span>
+              <span class="price">{{ '%g' % it.price }} {{ spec.currency }}</span></div>
+            {% if it.description %}<p class="desc">{{ it.description }}</p>{% endif %}
+            {% if it.tags %}<div class="tags">{% for t in it.tags %}<span class="tag">{{ t }}</span>{% endfor %}</div>{% endif %}
+          </div>
           {% if 'in-store-only' in it.tags %}
-          <span class="tag" style="align-self:flex-start;margin-top:6px">{% if spec.language == 'sv' %}Endast i butik{% else %}In store only{% endif %}</span>
+          <span class="tag instore">{% if spec.language == 'sv' %}Endast i butik{% else %}In store only{% endif %}</span>
           {% else %}
-          <button onclick="addToCart('{{ it.id }}')">{% if spec.language == 'sv' %}Lägg till{% else %}Add{% endif %} +</button>
+          <button class="add" onclick="addToCart('{{ it.id }}')" aria-label="Add {{ it.name }}">＋</button>
           {% endif %}
         </div>
         {% endfor %}
@@ -252,6 +272,12 @@
 
   <footer>{{ spec.business_name }} · Powered by Vibe Business</footer>
 </div>
+
+<button class="cartbar" id="cartbar" hidden>
+  <span class="count" id="cbcount">0</span>
+  <span class="lbl">{% if spec.language == 'sv' %}Visa beställning{% else %}View order{% endif %}</span>
+  <span class="tot" id="cbtotal"></span>
+</button>
 
 <div class="drawer" id="drawer">
   <h2>{% if spec.language == 'sv' %}Din beställning{% else %}Your order{% endif %}
@@ -338,8 +364,8 @@ const T = {
 const MODE_LABEL = { dine_in: T.eatin, pickup: T.away, delivery: T.deliv };
 
 const drawer = document.getElementById('drawer');
-document.getElementById('cartbtn').onclick = () => drawer.classList.add('open');
-document.getElementById('closecart').onclick = () => drawer.classList.remove('open');
+document.getElementById('cartbtn').onclick = () => { drawer.classList.add('open'); renderCart(); };
+document.getElementById('closecart').onclick = () => { drawer.classList.remove('open'); renderCart(); };
 
 // ---- Step 1: eat here or take away, asked before the menu ----
 let mode = null, payment = null;
@@ -395,29 +421,21 @@ if (qTable && document.querySelector('#gate .opt[data-v="dine_in"]')) {
   gate.classList.add('show');
 }
 
-// ---- Category folders ----
-const folders = document.getElementById('folders');
-const backBtn = document.getElementById('backbtn');
-const menuHead = document.getElementById('menuhead');
-const cats = [...document.querySelectorAll('.category')];
+// ---- Category pills: a map of the menu, not doors in front of it ----
+const pills = [...document.querySelectorAll('#pills button')];
+for (const b of pills) b.onclick = () => {
+  document.getElementById(b.dataset.target).scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+const spy = new IntersectionObserver(entries => {
+  for (const e of entries) if (e.isIntersecting) {
+    for (const b of pills) b.classList.toggle('on', b.dataset.target === e.target.id);
+  }
+}, { rootMargin: '-15% 0px -70% 0px' });
+for (const c of document.querySelectorAll('.category')) spy.observe(c);
 
-function openFolder(i) {
-  folders.hidden = true;
-  backBtn.hidden = false;
-  cats.forEach(c => { c.hidden = c.dataset.cat !== String(i); });
-  menuHead.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-function closeFolder() {
-  folders.hidden = false;
-  backBtn.hidden = true;
-  cats.forEach(c => { c.hidden = true; });
-}
-for (const f of document.querySelectorAll('.folder')) f.onclick = () => openFolder(f.dataset.cat);
-backBtn.onclick = closeFolder;
-// A single-category menu has nothing to drill into — show it flat.
-if (cats.length === 1) { folders.hidden = true; cats[0].hidden = false; }
+document.getElementById('cartbar').onclick = () => drawer.classList.add('open');
 
-function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); drawer.classList.add('open'); }
+function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); }
 function bump(id, d) { cart[id] = (cart[id] || 0) + d; if (cart[id] <= 0) delete cart[id]; renderCart(); }
 
 function cartTotal() {
@@ -430,7 +448,11 @@ function cartTotal() {
 function renderCart() {
   const box = document.getElementById('cartlines');
   const ids = Object.keys(cart);
-  document.getElementById('cartcount').textContent = ids.reduce((s, i) => s + cart[i], 0);
+  const n = ids.reduce((s, i) => s + cart[i], 0);
+  document.getElementById('cartcount').textContent = n;
+  const bar = document.getElementById('cartbar');
+  bar.hidden = !ids.length || drawer.classList.contains('open');
+  document.getElementById('cbcount').textContent = n;
   box.innerHTML = ids.length
     ? ids.map(id => {
         const it = ITEMS[id];
@@ -442,6 +464,7 @@ function renderCart() {
     : '<p class="empty">{% if spec.language == "sv" %}Varukorgen är tom{% else %}Your cart is empty{% endif %}</p>';
   const total = cartTotal();
   document.getElementById('carttotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
+  document.getElementById('cbtotal').textContent = total.toFixed(0) + ' ' + SPEC.currency;
 
   // The button says exactly what happens next, so nobody taps "Pay" expecting
   // a card form and lands on "go to the counter" instead.
@@ -488,7 +511,27 @@ payBtn.onclick = async () => {
       })
     });
     if (!res.ok) throw new Error((await res.json()).detail || 'checkout failed');
-    window.location.href = (await res.json()).url;
+    const data = await res.json();
+    // Kiosk iPad with a paired Zettle reader: drive the card payment right here,
+    // so the guest pays themself and nobody keys amounts into a terminal. On the
+    // plain web (or no reader) this silently falls back to the counter flow.
+    if (payment === 'in_store' && KIOSK && data.order_id
+        && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zettle) {
+      payBtn.textContent = '💳 …';
+      const paid = await new Promise(resolve => {
+        window.zettleResult = ok => resolve(!!ok);
+        window.webkit.messageHandlers.zettle.postMessage({
+          orderId: data.order_id, amountMinor: data.amount_minor,
+          currency: data.currency, orderNo: data.order_no });
+        setTimeout(() => resolve(false), 120000);  // guest walked away
+      });
+      if (paid) {
+        // Same endpoint the counter screen uses; the kiosk WebView carries the
+        // staff session, so this is exactly as authorized as the manual tap.
+        await fetch(`/api/admin/{{ project_id }}/orders/${data.order_id}/settle`, { method: 'POST' });
+      }
+    }
+    window.location.href = data.url;
   } catch (e) {
     err.textContent = e.message;
     payBtn.disabled = false;

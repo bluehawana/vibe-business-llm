@@ -38,7 +38,7 @@
   <p class="nolabel">{% if spec.language == 'sv' %}Ditt nummer{% else %}Your number{% endif %}</p>
   <div class="no">{{ no }}</div>
 
-  {% if instore %}
+  {% if instore and order.status != 'paid' %}
   <div class="pay">
     {% if spec.language == 'sv' %}Betala i kortterminalen i restaurangen{% else %}Pay on the card reader in the restaurant{% endif %}
     <span class="amt">{{ '%g' % order.total }} {{ order.currency }}</span>

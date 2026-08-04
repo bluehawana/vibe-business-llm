@@ -251,7 +251,14 @@ def checkout(project_id: str, body: CheckoutRequest):
     if payment == "in_store":
         order_id = db.create_order(project_id, order_items, customer, total, currency,
                                    "unpaid", serve_now=serve_now)
-        return {"url": f"/site/{project_id}/success?order={order_id}&instore=1"}
+        order = db.get_order(order_id)
+        # The kiosk app drives a paired Zettle reader with exactly these fields —
+        # amount from the server, never from anything the guest's browser computed.
+        return {"url": f"/site/{project_id}/success?order={order_id}&instore=1",
+                "order_id": order_id,
+                "order_no": str(order["order_no"]),
+                "amount_minor": int(round(total * 100)),
+                "currency": currency}
 
     if not stripe_pay.payments_configured():
         raise HTTPException(503, "Online payments are not set up yet for this shop")
