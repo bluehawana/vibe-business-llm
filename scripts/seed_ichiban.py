@@ -132,7 +132,7 @@ SPEC = {
         "font": "sans",
     },
     "hero": {"headline": "Ichiban Sushi", "subheadline": "Handmade sushi \u2014 eat in or take away",
-             "emoji": "🍣", "image": "/static/ichiban/hero.jpg"},
+             "emoji": "🍣", "image": "/static/ichiban/hero.jpg?v=2"},
     "menu": MENU,
     "seo": {
         "title": "Ichiban Sushi — Fresh Handmade Sushi & Poké Bowls",
@@ -141,7 +141,7 @@ SPEC = {
                        "We call your number when it's ready.",
     },
     "gallery": [
-        {"image": "/static/ichiban/plate.jpg", "caption": "Handmade fresh every day"},
+        {"image": "/static/ichiban/plate.jpg?v=2", "caption": "Handmade fresh every day"},
     ],
     "services": {
         "pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
