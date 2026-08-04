@@ -14,6 +14,11 @@ from .schema import DEFAULT_SPEC, find_menu_item
 
 app = FastAPI(title="Vibe Business")
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
+# Self-hosted images (menu photos, heroes). Hotlinking a site builder's CDN dies
+# the day that subscription ends; these live and deploy with the app.
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"),
+          name="static")
 
 # A single-restaurant install serves that restaurant at "/" instead of the
 # platform landing page. Empty = multi-tenant, as before.

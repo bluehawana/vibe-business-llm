@@ -123,15 +123,16 @@ SPEC = {
              "when your food is ready.",
     "language": "en",
     "currency": SEK,
+    # Matched to www.ichiban.biz: light, minimal, sans-serif, photo-forward.
     "theme": {
-        "primary_color": "#8c1c13",
-        "accent_color": "#c9713a",
-        "background_color": "#fbf6ee",
-        "text_color": "#25211c",
-        "font": "mixed",
+        "primary_color": "#b0191e",
+        "accent_color": "#d0342c",
+        "background_color": "#fbfbf9",
+        "text_color": "#1e1e1e",
+        "font": "sans",
     },
     "hero": {"headline": "Ichiban Sushi", "subheadline": "Handmade sushi \u2014 eat in or take away",
-             "emoji": "🍣"},
+             "emoji": "🍣", "image": "/static/ichiban/hero.jpg"},
     "menu": MENU,
     "seo": {
         "title": "Ichiban Sushi — Fresh Handmade Sushi & Poké Bowls",
@@ -139,7 +140,9 @@ SPEC = {
                        "eat in or take away — pay by card, Swish or at the counter. "
                        "We call your number when it's ready.",
     },
-    "gallery": [],
+    "gallery": [
+        {"image": "/static/ichiban/plate.jpg", "caption": "Handmade fresh every day"},
+    ],
     "services": {
         "pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
         "dine_in": True, "pay_online": True, "pay_in_store": True,
