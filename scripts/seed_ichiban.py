@@ -119,6 +119,7 @@ MENU = [
 SPEC = {
     "business_name": "Ichiban Sushi",
     "logo": "/static/ichiban/logo.png",
+    "copyright": "© 2026 Hong Yan AB",
     "tagline": "Fresh sushi, made by hand",
     "about": "We make all our sushi by hand, every day, from ingredients we pick ourselves. "
              "Order on the screen or on your phone \u2014 you get a number, and we call it "

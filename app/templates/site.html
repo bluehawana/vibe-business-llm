@@ -160,15 +160,15 @@
       border-radius: 16px 16px 0 0; aspect-ratio: 16 / 7; }
   .item .instore { align-self: flex-start; }
   /* Bottom cart bar — the one loud CTA, always within thumb's reach */
-  .cartbar { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 40;
-      display: flex; align-items: center; gap: 12px; background: var(--primary); color: #fff;
-      border: 0; border-radius: 999px; padding: 16px 22px; font-family: inherit;
-      font-size: 1.05rem; font-weight: 600; cursor: pointer;
-      box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+  .cartbar { position: fixed; right: 16px; bottom: 16px; z-index: 40;
+      display: flex; align-items: center; gap: 10px; background: var(--primary); color: #fff;
+      border: 0; border-radius: 999px; padding: 13px 20px; font-family: inherit;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.3); }
   .cartbar .count { background: rgba(255,255,255,.25); border-radius: 999px; min-width: 28px;
       height: 28px; display: grid; place-items: center; font-size: .95rem; }
   .cartbar .lbl { flex: 1; text-align: left; }
-  body { padding-bottom: 84px; }
+  body { padding-bottom: 24px; }
   /* Photos */  /* Photos */
   .hero.photo { background-size: cover; background-position: center; border-radius: 18px;
       margin-top: 6px; }
@@ -290,12 +290,11 @@
       </ul></div>
   </section>
 
-  <footer>{{ spec.business_name }} · Powered by Vibe Business</footer>
+  <footer>{{ spec.get('copyright') or spec.business_name }}</footer>
 </div>
 
 <button class="cartbar" id="cartbar" hidden>
   <span class="count" id="cbcount">0</span>
-  <span class="lbl">{% if spec.language == 'sv' %}Visa beställning{% else %}View order{% endif %}</span>
   <span class="tot" id="cbtotal"></span>
 </button>
 
