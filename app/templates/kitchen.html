@@ -81,7 +81,7 @@ async function refresh() {
       ? `<button class="b-ready" onclick="setStatus('${o.id}','ready')">Ready ✓</button>`
       : `<button class="b-done" onclick="setStatus('${o.id}','completed')">Handed over ✓✓</button>`;
     return `<div class="card ${o.fulfillment}">
-      <div class="head"><span class="oid">#${o.order_no ?? o.id.slice(0,4).toUpperCase()}</span>
+      <div class="head"><span class="oid">#${o.order_no || o.id.slice(0,4).toUpperCase()}</span>
         ${o.status === "unpaid" ? '<span class="unpaid">not paid</span>' : ""}
         <span class="age">${age(o.created_at)}</span></div>
       <span class="mode ${o.customer.mode}">${modeTxt}${where ? " · " + where : ""}${when}</span>

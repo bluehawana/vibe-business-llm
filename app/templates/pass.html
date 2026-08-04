@@ -69,7 +69,7 @@ async function done(id, btn) {
 
 function card(o, kind) {
   const c = o.customer;
-  const no = o.order_no ?? o.id.slice(0, 4).toUpperCase();
+  const no = o.order_no || o.id.slice(0, 4).toUpperCase();
   const dest = kind === "table"
     ? (c.table ? `Table ${c.table}` : "Eat in")
     : (c.mode === "delivery" ? `Delivery · ${c.address || ""}` : "Take away");
@@ -96,7 +96,7 @@ async function refresh() {
   let orders;
   try {
     orders = (await (await fetch(`/api/kitchen/${PID}/orders`)).json()).orders;
-  } catch { return; }
+  } catch (err) { return; }
   const ready = orders.filter(o => o.fulfillment === "ready");
   const toTable = ready.filter(o => o.customer.mode === "dine_in");
   const toBag = ready.filter(o => o.customer.mode !== "dine_in");

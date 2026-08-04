@@ -57,7 +57,7 @@ async function refresh() {
   let orders;
   try {
     orders = (await (await fetch(`/api/display/${PID}`)).json()).orders;
-  } catch { return; }  // a TV left on overnight must survive the server restarting
+  } catch (err) { return; }  // a TV left on overnight must survive the server restarting
   const prep = orders.filter(o => o.fulfillment === "new" || o.fulfillment === "preparing");
   const ready = orders.filter(o => o.fulfillment === "ready");
 

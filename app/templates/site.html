@@ -111,10 +111,10 @@
   .kiosk .choice { padding: 18px 10px; }
   /* Step 1 — asked before the menu, the way a host asks at the door, so every
      price, time and payment option below is already the right one. */
-  .gate { position: fixed; inset: 0; background: var(--bg); z-index: 80; display: none;
+  .gate { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: var(--bg); z-index: 80; display: none;
       flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 26px; }
   .gate.show { display: flex; }
-  .gate h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); text-align: center; }
+  .gate h1 { font-size: 1.9rem; text-align: center; }
   .gate .opts { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; width: 100%;
       max-width: 760px; }
   .gate .opt { flex: 1 1 200px; min-height: 210px; border: 2px solid var(--line); background: var(--card);
@@ -156,7 +156,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,.16); }
   .item .add:active { transform: translateY(-50%) scale(.92); }
   .item .photo { margin: -18px 46px 4px -18px; width: calc(100% + 36px); max-width: none;
-      border-radius: 16px 16px 0 0; aspect-ratio: 16 / 7; }
+      border-radius: 16px 16px 0 0; height: 170px; object-fit: cover; }
   .item .instore { align-self: flex-start; }
   /* Bottom cart bar — the one loud CTA, always within thumb's reach */
   /* Photos */  /* Photos */
@@ -168,7 +168,7 @@
   .gphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 14px; margin-top: 16px; }
   .gphotos figure { margin: 0; }
-  .gphotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px;
+  .gphotos img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px;
       display: block; }
   .gphotos figcaption { font-size: .82rem; opacity: .65; padding-top: 6px; }
 </style>
@@ -401,12 +401,13 @@ function setMode(v) {
   document.getElementById('timewrap').style.display = v === 'dine_in' ? 'none' : 'block';
   syncChoices('cmode', v);
   // Delivery has nobody to hand a reader to — only the online lane applies.
-  for (const b of document.querySelectorAll('#cpay .choice')) {
-    const blocked = v === 'delivery' && b.dataset.v === 'in_store';
+  each('#cpay .choice', function (b) {
+    var blocked = v === 'delivery' && b.dataset.v === 'in_store';
     b.hidden = blocked;
     if (blocked && payment === 'in_store') setPayment('online');
-  }
-  const visible = [...document.querySelectorAll('#cpay .choice')].filter(b => !b.hidden);
+  });
+  const visible = Array.prototype.slice.call(document.querySelectorAll('#cpay .choice'))
+      .filter(function (b) { return !b.hidden; });
   document.getElementById('cpay').classList.toggle('one', visible.length === 1);
   // Default to paying now: it is the lane that needs nobody behind a counter,
   // and it means the button's amount is honest from the first render.
@@ -419,14 +420,29 @@ function setMode(v) {
 
 function setPayment(v) { payment = v; syncChoices('cpay', v); renderCart(); }
 
+function each(sel, fn) {
+  var list = document.querySelectorAll(sel);
+  for (var i = 0; i < list.length; i++) fn(list[i]);
+}
 function syncChoices(groupId, v) {
-  for (const b of document.querySelectorAll(`#${groupId} .choice`))
+  each('#' + groupId + ' .choice', function (b) {
     b.setAttribute('aria-pressed', String(b.dataset.v === v));
+  });
 }
 
-for (const b of document.querySelectorAll('#gate .opt')) b.onclick = () => setMode(b.dataset.v);
-for (const b of document.querySelectorAll('#cmode .choice')) b.onclick = () => setMode(b.dataset.v);
-for (const b of document.querySelectorAll('#cpay .choice')) b.onclick = () => setPayment(b.dataset.v);
+// Event delegation instead of per-node handlers: works on 2016-era browsers
+// and survives any later script error — a dead menu on an old tablet taught us.
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  while (t && t !== document) {
+    if (t.dataset && t.dataset.v) {
+      if (t.parentNode && (t.parentNode.id === 'cpay')) { setPayment(t.dataset.v); return; }
+      if (t.className && String(t.className).indexOf('opt') > -1) { setMode(t.dataset.v); return; }
+      if (t.parentNode && t.parentNode.id === 'cmode') { setMode(t.dataset.v); return; }
+    }
+    t = t.parentNode;
+  }
+});
 chip.onclick = () => { drawer.classList.remove('open'); gate.classList.add('show'); };
 
 // ?table=5 from a QR code on the table: the guest is already sitting down, so
@@ -440,16 +456,24 @@ if (qTable && document.querySelector('#gate .opt[data-v="dine_in"]')) {
 }
 
 // ---- Category pills: a map of the menu, not doors in front of it ----
-const pills = [...document.querySelectorAll('#pills button')];
-for (const b of pills) b.onclick = () => {
-  document.getElementById(b.dataset.target).scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-const spy = new IntersectionObserver(entries => {
-  for (const e of entries) if (e.isIntersecting) {
-    for (const b of pills) b.classList.toggle('on', b.dataset.target === e.target.id);
-  }
-}, { rootMargin: '-15% 0px -70% 0px' });
-for (const c of document.querySelectorAll('.category')) spy.observe(c);
+const pills = Array.prototype.slice.call(document.querySelectorAll('#pills button'));
+pills.forEach(function (b) {
+  b.onclick = function () {
+    var target = document.getElementById(b.dataset.target);
+    try { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    catch (err) { target.scrollIntoView(); }
+  };
+});
+if ('IntersectionObserver' in window) {
+  const spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) pills.forEach(function (b) {
+        b.classList.toggle('on', b.dataset.target === e.target.id);
+      });
+    });
+  }, { rootMargin: '-15% 0px -70% 0px' });
+  each('.category', function (c) { spy.observe(c); });
+}
 
 function addToCart(id) { cart[id] = (cart[id] || 0) + 1; renderCart(); }
 function bump(id, d) { cart[id] = (cart[id] || 0) + d; if (cart[id] <= 0) delete cart[id]; renderCart(); }
