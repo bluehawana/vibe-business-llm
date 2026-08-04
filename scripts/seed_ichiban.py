@@ -138,10 +138,10 @@ SPEC = {
              "emoji": "🍣", "image": "/static/ichiban/hero.jpg?v=2"},
     "menu": MENU,
     "seo": {
-        "title": "Ichiban Sushi — Fresh Handmade Sushi & Poké Bowls",
-        "description": "Handmade sushi, poké bowls and hot dishes. Order online for "
-                       "eat in or take away — pay by card, Swish or at the counter. "
-                       "We call your number when it's ready.",
+        "title": "Ichiban Sushi Göteborg — Fresh Handmade Sushi & Poké Bowls",
+        "description": "Handmade sushi, poké bowls and hot dishes at Södra Vägen 91, "
+                       "by Liseberg. Order online for eat in or take away — card, "
+                       "Swish or pay at the counter.",
     },
     "gallery": [
         {"image": "/static/ichiban/plate.jpg?v=2", "caption": "Handmade fresh every day"},
@@ -151,10 +151,14 @@ SPEC = {
         "dine_in": True, "pay_online": True, "pay_in_store": True,
     },
     "hours": [
-        {"days": "Mon-Fri", "open": "11:00", "close": "21:00"},
-        {"days": "Sat-Sun", "open": "12:00", "close": "21:00"},
+        {"days": "Mon-Thu", "open": "11:00", "close": "20:00"},
+        {"days": "Fri", "open": "11:00", "close": "21:00"},
+        {"days": "Sat", "open": "13:00", "close": "21:00"},
+        {"days": "Sun", "open": "15:00", "close": "21:00"},
     ],
-    "contact": {"address": "", "phone": "", "email": ""},
+    "contact": {"address": "Södra Vägen 91, 412 63 Göteborg",
+                "phone": "031-83 17 86", "email": "info@ichiban.biz",
+                "facebook": "https://www.facebook.com/ichibangbg/", "instagram": ""},
     "announcements": [],
 }
 

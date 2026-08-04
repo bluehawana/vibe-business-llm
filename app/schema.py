@@ -99,6 +99,8 @@ SITE_SCHEMA = _obj({
         "address": {"type": "string"},
         "phone": {"type": "string"},
         "email": {"type": "string"},
+        "facebook": {"type": "string", "description": "Facebook page URL or empty"},
+        "instagram": {"type": "string", "description": "Instagram URL or empty"},
     }),
     "announcements": {
         "type": "array",
@@ -136,7 +138,7 @@ DEFAULT_SPEC = {
     "services": {"pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
                  "dine_in": False, "pay_online": True, "pay_in_store": True},
     "hours": [],
-    "contact": {"address": "", "phone": "", "email": ""},
+    "contact": {"address": "", "phone": "", "email": "", "facebook": "", "instagram": ""},
     "announcements": [],
 }
 

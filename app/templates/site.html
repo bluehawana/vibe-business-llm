@@ -270,6 +270,8 @@
         {% if spec.contact.address %}<li>{{ spec.contact.address }}</li>{% endif %}
         {% if spec.contact.phone %}<li>{{ spec.contact.phone }}</li>{% endif %}
         {% if spec.contact.email %}<li>{{ spec.contact.email }}</li>{% endif %}
+        {% if spec.contact.get('facebook') %}<li><a href="{{ spec.contact.facebook }}">Facebook</a></li>{% endif %}
+        {% if spec.contact.get('instagram') %}<li><a href="{{ spec.contact.instagram }}">Instagram</a></li>{% endif %}
       </ul></div>
   </section>
 
