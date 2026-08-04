@@ -783,3 +783,43 @@ def test_display_order_no_is_always_a_string(project_id):
     checkout(project_id, payment="in_store", kiosk=True)
     orders = guest.get(f"/api/display/{project_id}").json()["orders"]
     assert orders and all(isinstance(o["order_no"], str) for o in orders)
+
+
+# ---------- photos + SEO (the Wix replacement) ----------
+
+def test_seo_title_description_and_link_preview(project_id):
+    project = db.get_project(project_id)
+    project["spec"]["seo"] = {"title": "Testkrogen — Pizza & Pasta",
+                              "description": "Wood-fired pizza. Order online."}
+    project["spec"]["hero"]["image"] = "https://img.example/hero.jpg"
+    db.update_spec(project_id, project["spec"])
+    html = guest.get(f"/site/{project_id}").text
+    assert "<title>Testkrogen — Pizza &amp; Pasta</title>" in html
+    assert 'name="description" content="Wood-fired pizza. Order online."' in html
+    # the link preview when someone pastes the URL into a group chat
+    assert 'property="og:title"' in html
+    assert 'property="og:image" content="https://img.example/hero.jpg"' in html
+    assert 'property="og:url"' in html
+
+
+def test_seo_falls_back_to_name_and_tagline(project_id):
+    html = guest.get(f"/site/{project_id}").text
+    assert "<title>Testkrogen</title>" in html
+    assert 'name="description" content="Good food, made with care"' in html
+
+
+def test_dish_photos_and_gallery_render(project_id):
+    project = db.get_project(project_id)
+    project["spec"]["menu"][0]["items"][0]["image"] = "https://img.example/margherita.jpg"
+    project["spec"]["gallery"] = [{"image": "https://img.example/room.jpg",
+                                   "caption": "The dining room"}]
+    db.update_spec(project_id, project["spec"])
+    html = guest.get(f"/site/{project_id}").text
+    assert 'src="https://img.example/margherita.jpg"' in html
+    assert 'src="https://img.example/room.jpg"' in html and "The dining room" in html
+
+
+def test_no_photos_means_no_broken_images(project_id):
+    """A spec without photos must render exactly zero <img> tags."""
+    html = guest.get(f"/site/{project_id}").text
+    assert '<img' not in html

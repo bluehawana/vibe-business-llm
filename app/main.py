@@ -164,6 +164,7 @@ def site(request: Request, project_id: str):
         "spec": project["spec"],
         "spec_json": json.dumps(project["spec"], ensure_ascii=False),
         "payments_ready": stripe_pay.payments_configured(),
+        "page_url": f"{stripe_pay.BASE_URL}/site/{project_id}",
     })
 
 

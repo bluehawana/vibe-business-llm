@@ -133,6 +133,13 @@ SPEC = {
     "hero": {"headline": "Ichiban Sushi", "subheadline": "Handmade sushi \u2014 eat in or take away",
              "emoji": "🍣"},
     "menu": MENU,
+    "seo": {
+        "title": "Ichiban Sushi — Fresh Handmade Sushi & Poké Bowls",
+        "description": "Handmade sushi, poké bowls and hot dishes. Order online for "
+                       "eat in or take away — pay by card, Swish or at the counter. "
+                       "We call your number when it's ready.",
+    },
+    "gallery": [],
     "services": {
         "pickup": True, "delivery": False, "delivery_fee": 0, "min_order_for_delivery": 0,
         "dine_in": True, "pay_online": True, "pay_in_store": True,

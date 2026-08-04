@@ -3,7 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ spec.business_name }}</title>
+{% set seo_title = spec.get('seo', {}).get('title') or spec.business_name %}
+{% set seo_desc = spec.get('seo', {}).get('description') or spec.tagline %}
+<title>{{ seo_title }}</title>
+<meta name="description" content="{{ seo_desc }}">
+<!-- What the link looks like pasted into a group chat — for a restaurant that
+     preview IS the marketing. -->
+<meta property="og:title" content="{{ seo_title }}">
+<meta property="og:description" content="{{ seo_desc }}">
+<meta property="og:type" content="restaurant.restaurant">
+{% if page_url %}<meta property="og:url" content="{{ page_url }}">{% endif %}
+{% if spec.hero.get('image') %}<meta property="og:image" content="{{ spec.hero.image }}">{% endif %}
 <style>
   :root {
     --primary: {{ spec.theme.primary_color }};
@@ -120,6 +130,18 @@
   .folder .fcount { font-size: .8rem; opacity: .85; }
   .backbtn { background: none; border: 0; color: var(--primary); font-family: inherit;
       font-size: .95rem; cursor: pointer; padding: 12px 0; }
+  /* Photos */
+  .hero.photo { background-size: cover; background-position: center; border-radius: 18px;
+      margin-top: 6px; }
+  .hero.photo h1, .hero.photo p { color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.45); }
+  .hero.photo .badge { border-color: #fff; color: #fff; }
+  .item .photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; }
+  .gphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px; margin-top: 16px; }
+  .gphotos figure { margin: 0; }
+  .gphotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px;
+      display: block; }
+  .gphotos figcaption { font-size: .82rem; opacity: .65; padding-top: 6px; }
 </style>
 </head>
 <body class="{% if kiosk %}kiosk{% endif %}">
@@ -148,7 +170,7 @@
     <button class="cartbtn" id="cartbtn">🛒 <span id="cartcount">0</span></button>
   </nav>
 
-  <div class="hero">
+  <div class="hero{% if spec.hero.get('image') %} photo{% endif %}"{% if spec.hero.get('image') %} style="background-image:linear-gradient(rgba(22,17,12,.42),rgba(22,17,12,.55)),url('{{ spec.hero.image }}')"{% endif %}>
     <div class="emoji">{{ spec.hero.emoji }}</div>
     <h1>{{ spec.hero.headline }}</h1>
     <p>{{ spec.hero.subheadline }}</p>
@@ -186,6 +208,7 @@
       <div class="items">
         {% for it in cat['items'] %}
         <div class="item">
+          {% if it.get('image') %}<img class="photo" src="{{ it.image }}" alt="{{ it.name }}" loading="lazy">{% endif %}
           <div class="top"><span class="name">{{ it.name }}</span>
             <span class="price">{{ '%g' % it.price }} {{ spec.currency }}</span></div>
           <p class="desc">{{ it.description }}</p>
@@ -201,6 +224,18 @@
     </div>
     {% endfor %}
   </section>
+
+  {% if spec.get('gallery') %}
+  <section>
+    <h2>{% if spec.language == 'sv' %}Bilder{% else %}Gallery{% endif %}</h2>
+    <div class="gphotos">
+      {% for g in spec.gallery %}
+      <figure><img src="{{ g.image }}" alt="{{ g.caption }}" loading="lazy">
+        {% if g.caption %}<figcaption>{{ g.caption }}</figcaption>{% endif %}</figure>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 
   <section class="info">
     {% if spec.hours %}
