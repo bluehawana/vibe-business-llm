@@ -9,6 +9,12 @@ import SwiftUI
 /// iPads on the next load, with no rebuild, no re-signing and no App Store.
 @main
 struct ScreensApp: App {
+    init() {
+        // Zettle: "initialise the integration at application launch" — before
+        // the first payment, exactly once.
+        CardReader.driver.start()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

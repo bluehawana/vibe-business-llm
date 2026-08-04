@@ -39,6 +39,21 @@ struct ScreenPicker: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                     }
+                    LabeledContent("Zettle client ID") {
+                        TextField("from developer.zettle.com", text: $config.zettleClientID)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    if CardReader.driver.isAvailable {
+                        Button("Log in to Zettle") {
+                            if let vc = UIApplication.shared.connectedScenes
+                                .compactMap({ ($0 as? UIWindowScene)?.keyWindow?.rootViewController })
+                                .first {
+                                CardReader.driver.performLogin(from: vc)
+                            }
+                        }
+                    }
                 } header: {
                     Text("Server")
                 } footer: {

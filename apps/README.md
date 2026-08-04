@@ -69,3 +69,26 @@ cost a rebuild-and-reinstall cycle on four devices for every menu tweak. The
 shell adds the two things Safari doesn't: the screen never sleeps, and it
 reloads on wake, so an iPad that slept through a server restart comes back
 showing live orders instead of an error page nobody notices.
+
+## Zettle card reader (kiosk self-payment)
+
+The app is credential-ready. To activate the reader:
+
+1. **developer.zettle.com** → create an app for the iOS Payments SDK with:
+   - Bundle ID: `se.ichiban.screens`
+   - OAuth redirect URI: `ichiban://zettle` (must match exactly — the app
+     declares this URL scheme)
+2. In Xcode: File → Add Package Dependencies → `https://github.com/iZettle/sdk-ios`
+   (the `ZettleSDKDriver` behind `#if canImport(iZettleSDK)` activates by itself;
+   its charge call may need a one-line signature touch-up against the SDK version)
+3. On the kiosk iPad: three-finger hold → settings → paste the **Zettle client ID**
+   → relaunch → tap **Log in to Zettle** once with the restaurant's account
+4. Pair the Zettle Reader 2 over Bluetooth (the SDK's settings UI handles it)
+
+From then on, "pay by card here" at the kiosk drives the reader with the
+server-computed amount, and a successful tap settles the order automatically.
+
+⚠️ Do not go live with this lane before Zettle confirms in writing that
+SDK-initiated sales fall under their certified kassaregister — otherwise the
+kiosk may legally count as our own register, which requires a certified
+kontrollsystem. Until then the counter flow stays compliant.

@@ -56,6 +56,21 @@ targets:
           NSAllowsArbitraryLoads: true
         NSLocalNetworkUsageDescription:
           Connects to the restaurant's own server to show orders.
+        # --- Zettle Payments SDK requirements (developer.zettle.com) ---
+        NSBluetoothAlwaysUsageDescription:
+          Connects to the Zettle card reader so guests can pay at the kiosk.
+        NSLocationWhenInUseUsageDescription:
+          Required by the Zettle card reader connection.
+        UISupportedExternalAccessoryProtocols:
+          - com.izettle.cardreader-one
+        UIBackgroundModes:
+          - external-accessory
+          - bluetooth-central
+        # OAuth callback for Zettle login. On the Zettle Developer Portal, the
+        # redirect URI to register is exactly:  ichiban://zettle
+        CFBundleURLTypes:
+          - CFBundleURLName: se.ichiban.screens
+            CFBundleURLSchemes: [ichiban]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: se.ichiban.screens
